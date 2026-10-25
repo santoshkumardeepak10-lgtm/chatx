@@ -48,6 +48,11 @@ jobs:
           set -e
 
           mkdir -p android/app/src/main/java/com/chatx/app
+          mkdir -p android/app/src/main/res/drawable
+
+          # Copy ChatX custom icon
+          cp file_000000003fd48211a28aab2bb2741282.png \
+            android/app/src/main/res/drawable/chatx_icon.png
 
           cat > android/settings.gradle <<'EOF'
           pluginManagement {
@@ -87,8 +92,8 @@ jobs:
                   applicationId 'com.chatx.app'
                   minSdk 23
                   targetSdk 28
-                  versionCode 1
-                  versionName '1.0'
+                  versionCode 2
+                  versionName '1.1'
               }
 
               compileOptions {
@@ -104,6 +109,7 @@ jobs:
 
               <application
                   android:label="ChatX"
+                  android:icon="@drawable/chatx_icon"
                   android:usesCleartextTraffic="false"
                   android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
