@@ -3,6 +3,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#080d1b">
+  <meta name="description" content="ChatX — Connect beyond. Sign in and chat with your friends.">
   <title>ChatX | Connect Beyond</title>
   <link rel="stylesheet" href="style.css">  <style>
     body.auth-locked .app {
@@ -23,7 +24,9 @@
       font-family: Arial, sans-serif;
     }
 
-    #authScreen[hidden] {
+    #authScreen[hidden],
+    #signupPanel[hidden],
+    #loginPanel[hidden] {
       display: none !important;
     }
 
@@ -83,6 +86,35 @@
       font-size: 14px;
       line-height: 1.6;
       margin: 0 0 22px;
+    }
+
+    /* APK DOWNLOAD BUTTON */
+    .download-apk-btn {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0 0 20px;
+      padding: 15px 12px;
+      border: 1px solid rgba(255, 255, 255, .18);
+      border-radius: 13px;
+      background: linear-gradient(100deg, #7557ff, #24bfe8);
+      color: #fff;
+      text-align: center;
+      text-decoration: none;
+      font-family: Arial, sans-serif;
+      font-size: 15px;
+      font-weight: bold;
+      box-shadow: 0 8px 22px rgba(36, 191, 232, .15);
+      transition: transform .2s, opacity .2s;
+    }
+
+    .download-apk-btn:active {
+      transform: scale(.98);
+    }
+
+    .download-apk-btn:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 3px;
     }
 
     .auth-form label {
@@ -192,9 +224,20 @@
   <!-- LOGIN FORM -->
   <div id="loginPanel">
     <h2 class="auth-title">Welcome back</h2>
+
     <p class="auth-description">
       Sign in to continue to your personal ChatX space.
     </p>
+
+    <!-- APK DOWNLOAD BUTTON -->
+    <a
+      class="download-apk-btn"
+      href="https://drive.google.com/file/d/1yDrWD0J9CCvJUDKm2_BuNYdDDCx6P9bX/view?usp=drivesdk"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      📲 Download ChatX APK
+    </a>
 
     <form id="loginForm" class="auth-form">
       <label for="loginEmail">Email address</label>
@@ -233,6 +276,7 @@
   <!-- SIGNUP FORM -->
   <div id="signupPanel" hidden>
     <h2 class="auth-title">Create account</h2>
+
     <p class="auth-description">
       Join ChatX and create your own personal space.
     </p>
@@ -289,14 +333,19 @@
     </p>
   </div>
 
-  <div id="authMessage" class="auth-message" role="status" aria-live="polite"></div>
+  <div
+    id="authMessage"
+    class="auth-message"
+    role="status"
+    aria-live="polite"
+  ></div>
+
   <div id="authLoading" hidden>Checking your account...</div>
 
 </div>
 
   </section>  <!-- EXISTING CHATX APP -->  <div class="app"><!-- HOME SCREEN -->
 <section id="homeScreen" class="screen active">
-
   <header class="header">
     <div class="brand">
       <div class="logo">✦</div>
@@ -316,7 +365,11 @@
 
   <div class="search-box">
     <span>⌕</span>
-    <input type="search" id="searchInput" placeholder="Search conversations...">
+    <input
+      type="search"
+      id="searchInput"
+      placeholder="Search conversations..."
+    >
   </div>
 
   <div class="stories-section">
@@ -360,7 +413,6 @@
   </nav>
 </section>
 
-
 <!-- PEOPLE SCREEN -->
 <section id="peopleScreen" class="screen">
   <header class="page-header">
@@ -370,7 +422,11 @@
 
   <div class="search-box">
     <span>⌕</span>
-    <input type="search" id="peopleSearch" placeholder="Search friends...">
+    <input
+      type="search"
+      id="peopleSearch"
+      placeholder="Search friends..."
+    >
   </div>
 
   <div class="section-heading">
@@ -381,7 +437,6 @@
   <div id="peopleList" class="chat-list"></div>
   <button class="new-chat-btn" id="addPersonBtn">+</button>
 </section>
-
 
 <!-- CHAT SCREEN -->
 <section id="chatScreen" class="screen">
@@ -398,7 +453,9 @@
   </header>
 
   <div class="chat-background">
-    <div class="encryption-note">✦ Welcome to your ChatX conversation</div>
+    <div class="encryption-note">
+      ✦ Welcome to your ChatX conversation
+    </div>
     <div id="messages" class="messages"></div>
   </div>
 
@@ -414,7 +471,6 @@
     <button type="submit" class="send-btn">➤</button>
   </form>
 </section>
-
 
 <!-- STORY VIEWER -->
 <section id="storyScreen" class="screen">
@@ -437,7 +493,6 @@
     <div id="storyContent" class="story-content">✨</div>
   </div>
 </section>
-
 
 <!-- PROFILE SCREEN -->
 <section id="profileScreen" class="screen">
@@ -469,7 +524,9 @@
       class="secondary-btn"
       type="button"
       style="margin-top:18px"
-    >Log Out</button>
+    >
+      Log Out
+    </button>
   </div>
 
   <div class="settings-card">
@@ -478,7 +535,6 @@
     <p>Version 1.0</p>
   </div>
 </section>
-
 
 <!-- NEW CHAT MODAL -->
 <div id="newChatModal" class="modal hidden">
@@ -496,13 +552,18 @@
       >
 
       <div class="modal-actions">
-        <button type="button" id="cancelNewChat" class="secondary-btn">Cancel</button>
+        <button
+          type="button"
+          id="cancelNewChat"
+          class="secondary-btn"
+        >
+          Cancel
+        </button>
         <button type="submit" class="primary-btn">Create Chat</button>
       </div>
     </form>
   </div>
 </div>
-
 
 <!-- ADD STORY MODAL -->
 <div id="storyModal" class="modal hidden">
@@ -519,19 +580,20 @@
       ></textarea>
 
       <div class="modal-actions">
-        <button type="button" id="cancelStory" class="secondary-btn">Cancel</button>
+        <button
+          type="button"
+          id="cancelStory"
+          class="secondary-btn"
+        >
+          Cancel
+        </button>
         <button type="submit" class="primary-btn">Post Story</button>
       </div>
     </form>
   </div>
 </div>
 
-</div>
-<!-- EXISTING LOCAL APP SCRIPT -->
-<script type="module" src="script.js"></script>
-
-<!-- FIREBASE AUTHENTICATION -->
-<script type="module">
+  </div>  <!-- EXISTING CHATX SCRIPT -->  <script type="module" src="script.js"></script>  <!-- FIREBASE AUTHENTICATION -->  <script type="module">
     import { initializeApp }
       from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 
@@ -577,28 +639,43 @@
 
     function setBusy(form, busy) {
       const button = form.querySelector('button[type="submit"]');
+
       if (button) {
         button.disabled = busy;
         button.dataset.originalText ||= button.textContent;
-        button.textContent = busy ? "Please wait..." : button.dataset.originalText;
+        button.textContent = busy
+          ? "Please wait..."
+          : button.dataset.originalText;
       }
     }
 
     function friendlyError(error) {
       const messages = {
-        "auth/email-already-in-use": "This email already has an account. Please log in.",
-        "auth/invalid-email": "Please enter a valid email address.",
-        "auth/weak-password": "Use a stronger password with at least 6 characters.",
-        "auth/invalid-credential": "Email or password is incorrect.",
-        "auth/user-not-found": "No account found. Please create an account first.",
-        "auth/wrong-password": "Email or password is incorrect.",
-        "auth/too-many-requests": "Too many attempts. Please wait and try again.",
-        "auth/network-request-failed": "Network problem. Check your internet connection.",
-        "auth/operation-not-allowed": "Email/Password sign-in is not enabled in Firebase.",
-        "auth/unauthorized-domain": "This website domain is not authorized in Firebase Authentication."
+        "auth/email-already-in-use":
+          "This email already has an account. Please log in.",
+        "auth/invalid-email":
+          "Please enter a valid email address.",
+        "auth/weak-password":
+          "Use a stronger password with at least 6 characters.",
+        "auth/invalid-credential":
+          "Email or password is incorrect.",
+        "auth/user-not-found":
+          "No account found. Please create an account first.",
+        "auth/wrong-password":
+          "Email or password is incorrect.",
+        "auth/too-many-requests":
+          "Too many attempts. Please wait and try again.",
+        "auth/network-request-failed":
+          "Network problem. Check your internet connection.",
+        "auth/operation-not-allowed":
+          "Email/Password sign-in is not enabled in Firebase.",
+        "auth/unauthorized-domain":
+          "This website domain is not authorized in Firebase Authentication."
       };
 
-      return messages[error.code] || "Something went wrong. Please try again. (" + (error.code || "unknown") + ")";
+      return messages[error.code] ||
+        "Something went wrong. Please try again. (" +
+        (error.code || "unknown") + ")";
     }
 
     document.getElementById("showSignup").addEventListener("click", () => {
@@ -613,108 +690,103 @@
       loginPanel.hidden = false;
     });
 
-    document.getElementById("signupForm").addEventListener("submit", async (event) => {
-      event.preventDefault();
+    document.getElementById("signupForm").addEventListener(
+      "submit",
+      async (event) => {
+        event.preventDefault();
 
-      const form = event.currentTarget;
-      const name = document.getElementById("signupName").value.trim();
-      const email = document.getElementById("signupEmail").value.trim();
-      const password = document.getElementById("signupPassword").value;
-      const confirmPassword = document.getElementById("signupConfirm").value;
+        const form = event.currentTarget;
+        const name = document.getElementById("signupName").value.trim();
+        const email = document.getElementById("signupEmail").value.trim();
+        const password = document.getElementById("signupPassword").value;
+        const confirmPassword =
+          document.getElementById("signupConfirm").value;
 
-      clearMessage();
+        clearMessage();
 
-      if (name.length < 2) {
-        showMessage("Display name must contain at least 2 characters.");
-        return;
+        if (name.length < 2) {
+          showMessage("Display name must contain at least 2 characters.");
+          return;
+        }
+
+        if (password !== confirmPassword) {
+          showMessage("Passwords do not match.");
+          return;
+        }
+
+        setBusy(form, true);
+
+        try {
+          const result = await createUserWithEmailAndPassword(
+            auth,
+            email,
+            password
+          );
+
+          await updateProfile(result.user, {
+            displayName: name
+          });
+
+          document.getElementById("profileName").value = name;
+          document.getElementById("displayProfileName").textContent = name;
+
+          showMessage("Account created successfully!", "success");
+        } catch (error) {
+          showMessage(friendlyError(error));
+        } finally {
+          setBusy(form, false);
+        }
       }
+    );
 
-      if (password !== confirmPassword) {
-        showMessage("Passwords do not match.");
-        return;
+    document.getElementById("loginForm").addEventListener(
+      "submit",
+      async (event) => {
+        event.preventDefault();
+
+        const form = event.currentTarget;
+        const email = document.getElementById("loginEmail").value.trim();
+        const password = document.getElementById("loginPassword").value;
+
+        clearMessage();
+        setBusy(form, true);
+
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+        } catch (error) {
+          showMessage(friendlyError(error));
+        } finally {
+          setBusy(form, false);
+        }
       }
+    );
 
-      setBusy(form, true);
+    document.getElementById("forgotPassword").addEventListener(
+      "click",
+      async () => {
+        const email =
+          document.getElementById("loginEmail").value.trim();
 
-      try {
-        const result = await createUserWithEmailAndPassword(auth, email, password);
+        clearMessage();
 
-        await updateProfile(result.user, {
-          displayName: name
-        });
+        if (!email) {
+          showMessage("Enter your email address above first.");
+          return;
+        }
 
-        document.getElementById("profileName").value = name;
-        document.getElementById("displayProfileName").textContent = name;
-
-        showMessage("Account created successfully!", "success");
-      } catch (error) {
-        showMessage(friendlyError(error));
-      } finally {
-        setBusy(form, false);
+        try {
+          await sendPasswordResetEmail(auth, email);
+          showMessage(
+            "If an account exists for this email, a password reset email has been sent.",
+            "success"
+          );
+        } catch (error) {
+          showMessage(friendlyError(error));
+        }
       }
-    });
-
-    document.getElementById("loginForm").addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      const form = event.currentTarget;
-      const email = document.getElementById("loginEmail").value.trim();
-      const password = document.getElementById("loginPassword").value;
-
-      clearMessage();
-      setBusy(form, true);
-
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (error) {
-        showMessage(friendlyError(error));
-      } finally {
-        setBusy(form, false);
-      }
-    });
-
-    document.getElementById("forgotPassword").addEventListener("click", async () => {
-      const email = document.getElementById("loginEmail").value.trim();
-
-      clearMessage();
-
-      if (!email) {
-        showMessage("Enter your email address above first.");
-        return;
-      }
-
-      try {
-        await sendPasswordResetEmail(auth, email);
-        showMessage("If an account exists for this email, a password reset email has been sent.", "success");
-      } catch (error) {
-        showMessage(friendlyError(error));
-      }
-    });
+    );
 
     logoutBtn.addEventListener("click", async () => {
       try {
         await signOut(auth);
-      } catch (error) {
-        alert(friendlyError(error));
-      }
-    });
-
-    onAuthStateChanged(auth, (user) => {
-      authLoading.hidden = true;
-
-      if (user) {
-        document.body.classList.remove("auth-locked");
-        authScreen.hidden = true;
-
-        const name = user.displayName || user.email?.split("@")[0] || "ChatX User";
-
-        document.getElementById("displayProfileName").textContent = name;
-        document.getElementById("profileName").value = name;
-        document.getElementById("accountEmail").textContent = user.email || "";
-      } else {
-        document.body.classList.add("auth-locked");
-        authScreen.hidden = false;
-      }
-    });
-  </script></body>
-</html>
+      
