@@ -28,8 +28,9 @@ jobs:
         shell: bash
         run: |
           set -e
+          set +o pipefail
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            --sdk_root="$ANDROID_HOME" --licenses || test "$?" -eq 141
+            --sdk_root="$ANDROID_HOME" --licenses
 
       - name: Install Android SDK packages
         shell: bash
