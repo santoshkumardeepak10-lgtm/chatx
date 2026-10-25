@@ -1,10 +1,12 @@
 name: Build ChatX APK
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+    paths:
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,7 +14,7 @@ permissions:
 jobs:
   build:
     name: Build Android APK
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
@@ -24,47 +26,34 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Accept Android SDK licenses
-        shell: bash
-        run: |
-          set -e
-          set +o pipefail
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            --sdk_root="$ANDROID_HOME" --licenses
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Install Android SDK packages
-        shell: bash
         run: |
-          set -e
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools"
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platforms;android-35"
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "build-tools;35.0.0"
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Create Firebase configuration
-        shell: bash
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          set -e
           if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "Missing GOOGLE_SERVICES_JSON repository secret."
+            echo "GOOGLE_SERVICES_JSON secret is missing."
             exit 1
           fi
+
           mkdir -p android/app
-          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-          python3 -c "import json; json.load(open('android/app/google-services.json'))"
+          printf '%s' "$GOOGLE_SERVICES_JSON" \
+            > android/app/google-services.json
 
       - name: Create Android project
         shell: bash
         run: |
-          set -e
-
           mkdir -p android/app/src/main/java/com/chatx/app
-          mkdir -p android/app/src/main/res/drawable
-
-          cp file_000000003fd48211a28aab2bb2741282.png \
-            android/app/src/main/res/drawable/chatx_icon.png
 
           cat > android/settings.gradle <<'EOF'
           pluginManagement {
@@ -74,6 +63,7 @@ jobs:
                   gradlePluginPortal()
               }
           }
+
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
@@ -81,8 +71,9 @@ jobs:
                   mavenCentral()
               }
           }
-          rootProject.name = 'ChatX'
-          include ':app'
+
+          rootProject.name = "ChatX"
+          include(":app")
           EOF
 
           cat > android/build.gradle <<'EOF'
@@ -90,6 +81,11 @@ jobs:
               id 'com.android.application' version '8.7.3' apply false
               id 'com.google.gms.google-services' version '4.4.4' apply false
           }
+          EOF
+
+          cat > android/gradle.properties <<'EOF'
+          android.useAndroidX=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           EOF
 
           cat > android/app/build.gradle <<'EOF'
@@ -109,11 +105,6 @@ jobs:
                   versionCode 5
                   versionName '1.4'
               }
-
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
           }
 
           dependencies {
@@ -125,22 +116,21 @@ jobs:
 
           cat > android/app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
               <application
+                  android:allowBackup="true"
                   android:label="ChatX"
-                  android:icon="@drawable/chatx_icon"
                   android:usesCleartextTraffic="false"
                   android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-                  <meta-data
-                      android:name="com.google.firebase.messaging.default_notification_channel_id"
-                      android:value="chatx_messages" />
-
                   <activity
                       android:name=".MainActivity"
-                      android:exported="true">
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -150,10 +140,12 @@ jobs:
                   <service
                       android:name=".ChatXMessagingService"
                       android:exported="false">
+
                       <intent-filter>
                           <action android:name="com.google.firebase.MESSAGING_EVENT" />
                       </intent-filter>
                   </service>
+
               </application>
           </manifest>
           EOF
@@ -163,91 +155,59 @@ jobs:
 
           import android.Manifest;
           import android.app.Activity;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
           import android.content.pm.PackageManager;
           import android.os.Build;
           import android.os.Bundle;
+          import android.util.Log;
+          import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
-          import android.webkit.WebSettings;
-          import android.webkit.WebChromeClient;
-
-          import androidx.core.app.ActivityCompat;
-          import androidx.core.content.ContextCompat;
 
           import com.google.firebase.messaging.FirebaseMessaging;
 
           public class MainActivity extends Activity {
-              private WebView webView;
-              private static final int NOTIFICATION_PERMISSION_REQUEST = 101;
+              private static final String TAG = "ChatX";
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
 
-                  createNotificationChannel();
-                  requestNotificationPermission();
+                  if (Build.VERSION.SDK_INT >= 33 &&
+                      checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                          != PackageManager.PERMISSION_GRANTED) {
+                      requestPermissions(
+                          new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101
+                      );
+                  }
+
+                  WebView webView = new WebView(this);
+                  WebSettings settings = webView.getSettings();
+
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setDatabaseEnabled(true);
+                  settings.setLoadsImagesAutomatically(true);
+
+                  webView.setWebViewClient(new WebViewClient());
+                  setContentView(webView);
+
+                  webView.loadUrl(
+                      "https://santoshkumardeepak10-lgtm.github.io/chatx/"
+                  );
 
                   FirebaseMessaging.getInstance().getToken()
                       .addOnCompleteListener(task -> {
                           if (task.isSuccessful()) {
-                              android.util.Log.d("ChatXFCM", "FCM token obtained");
+                              Log.d(TAG, "FCM token obtained successfully.");
                           } else {
-                              android.util.Log.e("ChatXFCM", "FCM token failed",
-                                  task.getException());
+                              Log.e(TAG, "Unable to obtain FCM token.");
                           }
                       });
-
-                  webView = new WebView(this);
-                  WebSettings settings = webView.getSettings();
-                  settings.setJavaScriptEnabled(true);
-                  settings.setDomStorageEnabled(true);
-                  webView.setWebViewClient(new WebViewClient());
-                  webView.setWebChromeClient(new WebChromeClient());
-
-                  setContentView(webView);
-                  webView.loadUrl(
-                      "https://santoshkumardeepak10-lgtm.github.io/chatx/"
-                  );
-              }
-
-              private void requestNotificationPermission() {
-                  if (Build.VERSION.SDK_INT >= 33 &&
-                      ContextCompat.checkSelfPermission(
-                          this, Manifest.permission.POST_NOTIFICATIONS
-                      ) != PackageManager.PERMISSION_GRANTED) {
-                      ActivityCompat.requestPermissions(
-                          this,
-                          new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                          NOTIFICATION_PERMISSION_REQUEST
-                      );
-                  }
-              }
-
-              private void createNotificationChannel() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      NotificationChannel channel = new NotificationChannel(
-                          "chatx_messages",
-                          "ChatX Messages",
-                          NotificationManager.IMPORTANCE_HIGH
-                      );
-                      channel.setDescription("Notifications for ChatX messages");
-                      NotificationManager manager =
-                          getSystemService(NotificationManager.class);
-                      if (manager != null) {
-                          manager.createNotificationChannel(channel);
-                      }
-                  }
               }
 
               @Override
               public void onBackPressed() {
-                  if (webView != null && webView.canGoBack()) {
-                      webView.goBack();
-                  } else {
-                      super.onBackPressed();
-                  }
+                  super.onBackPressed();
               }
           }
           EOF
@@ -267,17 +227,93 @@ jobs:
           import com.google.firebase.messaging.RemoteMessage;
 
           public class ChatXMessagingService extends FirebaseMessagingService {
-              @Override
-              public void onNewToken(String token) {
-                  super.onNewToken(token);
-                  // Register the token through a secure authenticated backend.
-              }
 
               @Override
               public void onMessageReceived(RemoteMessage message) {
                   super.onMessageReceived(message);
 
                   String title = "ChatX";
+                  String body = "You have a new message.";
+
+                  if (message.getNotification() != null) {
+                      if (message.getNotification().getTitle() != null) {
+                          title = message.getNotification().getTitle();
+                      }
+                      if (message.getNotification().getBody() != null) {
+                          body = message.getNotification().getBody();
+                      }
+                  } else {
+                      if (message.getData().get("title") != null) {
+                          title = message.getData().get("title");
+                      }
+                      if (message.getData().get("body") != null) {
+                          body = message.getData().get("body");
+                      }
+                  }
+
+                  NotificationManager manager =
+                      (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
+                  if (manager == null) return;
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          "chatx_messages",
+                          "ChatX Messages",
+                          NotificationManager.IMPORTANCE_HIGH
+                      );
+                      manager.createNotificationChannel(channel);
+                  }
+
+                  Intent intent = new Intent(this, MainActivity.class);
+                  intent.addFlags(
+                      Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                      Intent.FLAG_ACTIVITY_SINGLE_TOP
+                  );
+
+                  PendingIntent pendingIntent = PendingIntent.getActivity(
+                      this,
+                      0,
+                      intent,
+                      PendingIntent.FLAG_UPDATE_CURRENT |
+                          PendingIntent.FLAG_IMMUTABLE
+                  );
+
+                  NotificationCompat.Builder notification =
+                      new NotificationCompat.Builder(this, "chatx_messages")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle(title)
+                          .setContentText(body)
+                          .setStyle(
+                              new NotificationCompat.BigTextStyle().bigText(body)
+                          )
+                          .setPriority(NotificationCompat.PRIORITY_HIGH)
+                          .setAutoCancel(true)
+                          .setContentIntent(pendingIntent);
+
+                  manager.notify(
+                      (int) (System.currentTimeMillis() & 0x7fffffff),
+                      notification.build()
+                  );
+              }
+          }
+          EOF
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        run: gradle -p android assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChatX-Android-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30                 String title = "ChatX";
                   String body = "You have a new message.";
 
                   if (message.getNotification() != null) {
