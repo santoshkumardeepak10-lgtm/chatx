@@ -37,10 +37,23 @@ jobs:
         run: |
           set -e
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools"
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platforms;android-35"
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "build-tools;35.0.0"
+
+      - name: Create Firebase configuration
+        shell: bash
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          set -e
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "Missing GOOGLE_SERVICES_JSON repository secret."
+            exit 1
+          fi
+          mkdir -p android/app
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          python3 -c "import json; json.load(open('android/app/google-services.json'))"
 
       - name: Create Android project
         shell: bash
@@ -50,7 +63,6 @@ jobs:
           mkdir -p android/app/src/main/java/com/chatx/app
           mkdir -p android/app/src/main/res/drawable
 
-          # Copy ChatX custom icon
           cp file_000000003fd48211a28aab2bb2741282.png \
             android/app/src/main/res/drawable/chatx_icon.png
 
@@ -76,12 +88,14 @@ jobs:
           cat > android/build.gradle <<'EOF'
           plugins {
               id 'com.android.application' version '8.7.3' apply false
+              id 'com.google.gms.google-services' version '4.5.0' apply false
           }
           EOF
 
           cat > android/app/build.gradle <<'EOF'
           plugins {
               id 'com.android.application'
+              id 'com.google.gms.google-services'
           }
 
           android {
@@ -92,8 +106,8 @@ jobs:
                   applicationId 'com.chatx.app'
                   minSdk 23
                   targetSdk 28
-                  versionCode 2
-                  versionName '1.1'
+                  versionCode 3
+                  versionName '1.2'
               }
 
               compileOptions {
@@ -101,17 +115,28 @@ jobs:
                   targetCompatibility JavaVersion.VERSION_17
               }
           }
+
+          dependencies {
+              implementation platform('com.google.firebase:firebase-bom:35.0.2')
+              implementation 'com.google.firebase:firebase-messaging'
+              implementation 'androidx.core:core:1.15.0'
+          }
           EOF
 
           cat > android/app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
               <application
                   android:label="ChatX"
                   android:icon="@drawable/chatx_icon"
                   android:usesCleartextTraffic="false"
                   android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+                  <meta-data
+                      android:name="com.google.firebase.messaging.default_notification_channel_id"
+                      android:value="chatx_messages" />
 
                   <activity
                       android:name=".MainActivity"
@@ -121,6 +146,14 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
+
+                  <service
+                      android:name=".ChatXMessagingService"
+                      android:exported="false">
+                      <intent-filter>
+                          <action android:name="com.google.firebase.MESSAGING_EVENT" />
+                      </intent-filter>
+                  </service>
               </application>
           </manifest>
           EOF
@@ -128,25 +161,50 @@ jobs:
           cat > android/app/src/main/java/com/chatx/app/MainActivity.java <<'EOF'
           package com.chatx.app;
 
+          import android.Manifest;
           import android.app.Activity;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.content.pm.PackageManager;
+          import android.os.Build;
           import android.os.Bundle;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
           import android.webkit.WebSettings;
           import android.webkit.WebChromeClient;
 
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.content.ContextCompat;
+
+          import com.google.firebase.messaging.FirebaseMessaging;
+
           public class MainActivity extends Activity {
               private WebView webView;
+              private static final int NOTIFICATION_PERMISSION_REQUEST = 101;
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
 
+                  createNotificationChannel();
+                  requestNotificationPermission();
+
+                  FirebaseMessaging.getInstance().getToken()
+                      .addOnCompleteListener(task -> {
+                          if (task.isSuccessful()) {
+                              // Token obtained. Register it securely with a backend
+                              // before using it for user-specific chat notifications.
+                              android.util.Log.d("ChatXFCM", "FCM token obtained");
+                          } else {
+                              android.util.Log.e("ChatXFCM", "FCM token failed",
+                                  task.getException());
+                          }
+                      });
+
                   webView = new WebView(this);
                   WebSettings settings = webView.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
-
                   webView.setWebViewClient(new WebViewClient());
                   webView.setWebChromeClient(new WebChromeClient());
 
@@ -156,6 +214,33 @@ jobs:
                   );
               }
 
+              private void requestNotificationPermission() {
+                  if (Build.VERSION.SDK_INT >= 33 &&
+                      ContextCompat.checkSelfPermission(
+                          this, Manifest.permission.POST_NOTIFICATIONS
+                      ) != PackageManager.PERMISSION_GRANTED) {
+                      ActivityCompat.requestPermissions(
+                          this,
+                          new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                          NOTIFICATION_PERMISSION_REQUEST
+                      );
+                  }
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          "chatx_messages",
+                          "ChatX Messages",
+                          NotificationManager.IMPORTANCE_HIGH
+                      );
+                      channel.setDescription("Notifications for ChatX messages");
+                      NotificationManager manager =
+                          getSystemService(NotificationManager.class);
+                      if (manager != null) manager.createNotificationChannel(channel);
+                  }
+              }
+
               @Override
               public void onBackPressed() {
                   if (webView != null && webView.canGoBack()) {
@@ -163,6 +248,88 @@ jobs:
                   } else {
                       super.onBackPressed();
                   }
+              }
+          }
+          EOF
+
+          cat > android/app/src/main/java/com/chatx/app/ChatXMessagingService.java <<'EOF'
+          package com.chatx.app;
+
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.content.Intent;
+          import android.os.Build;
+
+          import androidx.core.app.NotificationCompat;
+
+          import com.google.firebase.messaging.FirebaseMessagingService;
+          import com.google.firebase.messaging.RemoteMessage;
+
+          public class ChatXMessagingService extends FirebaseMessagingService {
+              @Override
+              public void onNewToken(String token) {
+                  super.onNewToken(token);
+                  // Store the token through an authenticated, secure backend.
+              }
+
+              @Override
+              public void onMessageReceived(RemoteMessage message) {
+                  super.onMessageReceived(message);
+
+                  String title = "ChatX";
+                  String body = "You have a new message.";
+
+                  if (message.getNotification() != null) {
+                      if (message.getNotification().getTitle() != null) {
+                          title = message.getNotification().getTitle();
+                      }
+                      if (message.getNotification().getBody() != null) {
+                          body = message.getNotification().getBody();
+                      }
+                  } else {
+                      if (message.getData().get("title") != null) {
+                          title = message.getData().get("title");
+                      }
+                      if (message.getData().get("body") != null) {
+                          body = message.getData().get("body");
+                      }
+                  }
+
+                  NotificationManager manager =
+                      (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                  if (manager == null) return;
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          "chatx_messages",
+                          "ChatX Messages",
+                          NotificationManager.IMPORTANCE_HIGH
+                      );
+                      manager.createNotificationChannel(channel);
+                  }
+
+                  Intent intent = new Intent(this, MainActivity.class);
+                  intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
+                      | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
+                  PendingIntent pendingIntent = PendingIntent.getActivity(
+                      this, 0, intent,
+                      PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                  );
+
+                  NotificationCompat.Builder notification =
+                      new NotificationCompat.Builder(this, "chatx_messages")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle(title)
+                          .setContentText(body)
+                          .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                          .setPriority(NotificationCompat.PRIORITY_HIGH)
+                          .setAutoCancel(true)
+                          .setContentIntent(pendingIntent);
+
+                  manager.notify((int) (System.currentTimeMillis() & 0x7fffffff),
+                      notification.build());
               }
           }
           EOF
