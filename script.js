@@ -1,17 +1,17 @@
 /* ==========================================
    CHATX — MIDNIGHT AURORA
-   VERSION 3.1
+   VERSION 3.2
 
    REAL-TIME CHAT
    SHARED 24-HOUR STORIES
    IN-APP NOTIFICATIONS
-   UNREAD CHAT BADGES
-   FIREBASE AUTH + FIRESTORE
+   UNREAD BADGES
+   CLEAR CHAT + DELETE CHAT
 ========================================== */
 
 "use strict";
 
-/* ========== FIREBASE IMPORTS ========== */
+/* ========== FIREBASE ========== */
 
 import {
   initializeApp,
@@ -40,8 +40,6 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
-/* ========== FIREBASE CONFIG ========== */
-
 const firebaseConfig = {
   apiKey: "AIzaSyCAeOr_hpbi22EHQ3w1RakU-WUASEIif1A",
   authDomain: "chatx-b1cea.firebaseapp.com",
@@ -65,9 +63,9 @@ const $ = id => document.getElementById(id);
 
 const homeScreen = $("homeScreen");
 const chatScreen = $("chatScreen");
+const peopleScreen = $("peopleScreen");
 const storyScreen = $("storyScreen");
 const profileScreen = $("profileScreen");
-const peopleScreen = $("peopleScreen");
 
 const chatList = $("chatList");
 const peopleList = $("peopleList");
@@ -81,26 +79,26 @@ let currentUser = null;
 let registeredUsers = [];
 let conversations = [];
 let stories = [];
+let currentMessages = [];
 
 let activeChatId = null;
 let activeChatUser = null;
+let activeStoryId = null;
 
 let usersUnsubscribe = null;
 let chatsUnsubscribe = null;
 let messagesUnsubscribe = null;
 let storiesUnsubscribe = null;
 
-let sessionVersion = 0;
-
 let storyTimer = null;
-let activeStoryId = null;
-
-let notificationsReady = false;
-let knownChatUpdates = new Map();
-
 let storyRefreshInterval = null;
 
-const STORY_DURATION = 24 * 60 * 60 * 1000;
+let sessionVersion = 0;
+let notificationsReady = false;
+
+const knownChatUpdates = new Map();
+
+const STORY_DURATION = 86400000;
 
 /* ========== HELPERS ========== */
 
@@ -153,10 +151,7 @@ function formatStoryTime(time) {
   );
 
   if (minutes < 1) return "Just now";
-
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
+  if (minutes < 60) return `${minutes}m ago`;
 
   return `${Math.floor(minutes / 60)}h ago`;
 }
@@ -167,9 +162,7 @@ function showScreen(screen) {
       item.classList.remove("active");
     });
 
-  if (screen) {
-    screen.classList.add("active");
-  }
+  screen?.classList.add("active");
 }
 
 function selectTab(id) {
@@ -189,7 +182,7 @@ function closeModal(id) {
   $(id)?.classList.add("hidden");
 }
 
-function showEmpty(container, text) {
+function showEmpty(container, message) {
   if (!container) return;
 
   container.innerHTML = "";
@@ -204,8 +197,7 @@ function showEmpty(container, text) {
     line-height:1.8;
   `;
 
-  div.textContent = text;
-
+  div.textContent = message;
   container.appendChild(div);
 }
 
@@ -215,25 +207,206 @@ function reportError(error, action) {
   if (error?.code === "permission-denied") {
     alert(
       action +
-      " failed: Firebase permission denied. " +
-      "Check Firestore Security Rules."
+      " failed. Check Firebase Firestore Security Rules."
     );
-
     return;
   }
 
   alert(
     action +
-    " failed. " +
-    (error?.message || "Check internet connection.")
+    " failed: " +
+    (error?.message || "Unknown error")
   );
 }
 
-/* ========== NOTIFICATION STYLES ========== */
+/* ========== LOCAL STORAGE ========== */
 
-const notificationStyle = document.createElement("style");
+function storageKey(type, chatId) {
+  return (
+    "chatx_" +
+    type +
+    "_" +
+    currentUser?.uid +
+    "_" +
+    chatId
+  );
+}
 
-notificationStyle.textContent = `
+function getStoredNumber(type, chatId) {
+  try {
+    return Number(
+      localStorage.getItem(
+        storageKey(type, chatId)
+      )
+    ) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setStoredNumber(type, chatId, value) {
+  try {
+    localStorage.setItem(
+      storageKey(type, chatId),
+      String(value)
+    );
+  } catch (error) {
+    console.warn("Storage unavailable:", error);
+  }
+}
+
+function getLastRead(chatId) {
+  return getStoredNumber("read", chatId);
+}
+
+function getClearTime(chatId) {
+  return getStoredNumber("clear", chatId);
+}
+
+function getDeleteTime(chatId) {
+  return getStoredNumber("deleted", chatId);
+}
+
+function markChatRead(chatId) {
+  if (!currentUser || !chatId) return;
+
+  setStoredNumber(
+    "read",
+    chatId,
+    Date.now()
+  );
+
+  renderChats($("searchInput").value);
+}
+
+/* ========== CLEAR CHAT ========== */
+
+function clearCurrentChat() {
+  if (!currentUser || !activeChatId) return;
+
+  const confirmed = confirm(
+    "Clear this chat?\n\n" +
+    "All previous messages will be hidden " +
+    "on this device only.\n\n" +
+    "The other person will still have them."
+  );
+
+  if (!confirmed) return;
+
+  setStoredNumber(
+    "clear",
+    activeChatId,
+    Date.now()
+  );
+
+  renderMessages(currentMessages);
+
+  showNotification(
+    "Chat cleared",
+    "Previous messages are hidden on this device."
+  );
+}
+
+/* ========== DELETE CHAT ========== */
+
+function deleteCurrentChat() {
+  if (!currentUser || !activeChatId) return;
+
+  const confirmed = confirm(
+    "Delete this conversation?\n\n" +
+    "It will disappear from your chat list " +
+    "on this device.\n\n" +
+    "The other person's chat will not be deleted."
+  );
+
+  if (!confirmed) return;
+
+  const chatId = activeChatId;
+  const now = Date.now();
+
+  setStoredNumber(
+    "deleted",
+    chatId,
+    now
+  );
+
+  setStoredNumber(
+    "clear",
+    chatId,
+    now
+  );
+
+  goHome();
+
+  renderChats($("searchInput").value);
+
+  showNotification(
+    "Chat deleted",
+    "Conversation removed from your list."
+  );
+}
+
+/* ========== CHAT OPTIONS MENU ========== */
+
+const chatOptionsStyle = document.createElement("style");
+
+chatOptionsStyle.textContent = `
+.chatx-options-overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.55);
+  z-index:99998;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  box-sizing:border-box;
+}
+
+.chatx-options-card {
+  width:100%;
+  max-width:350px;
+  background:#192542;
+  color:white;
+  border:1px solid #40537b;
+  border-radius:20px;
+  padding:22px;
+  box-sizing:border-box;
+  font-family:Arial,sans-serif;
+}
+
+.chatx-options-card h3 {
+  margin:0 0 8px;
+}
+
+.chatx-options-card p {
+  color:#aebbd4;
+  font-size:13px;
+  margin:0 0 20px;
+}
+
+.chatx-option-btn {
+  width:100%;
+  padding:14px;
+  margin-top:10px;
+  border:1px solid #40537b;
+  border-radius:12px;
+  background:#101a31;
+  color:white;
+  font-size:14px;
+  cursor:pointer;
+  text-align:left;
+}
+
+.chatx-option-danger {
+  color:#ff8da2;
+}
+
+.chatx-option-cancel {
+  text-align:center;
+  background:#263657;
+}
+
 .chatx-notification {
   position:fixed;
   top:18px;
@@ -248,8 +421,8 @@ notificationStyle.textContent = `
   border:1px solid #5269aa;
   box-shadow:0 10px 35px #0008;
   z-index:99999;
-  font-family:Arial,sans-serif;
   box-sizing:border-box;
+  font-family:Arial,sans-serif;
   cursor:pointer;
 }
 
@@ -272,13 +445,13 @@ notificationStyle.textContent = `
   min-width:19px;
   height:19px;
   padding:0 4px;
-  box-sizing:border-box;
   border-radius:20px;
   background:#ff4568;
   color:white;
   font-size:11px;
   font-weight:bold;
   margin-left:8px;
+  box-sizing:border-box;
 }
 
 .chatx-story {
@@ -293,7 +466,81 @@ notificationStyle.textContent = `
 }
 `;
 
-document.head.appendChild(notificationStyle);
+document.head.appendChild(chatOptionsStyle);
+
+function closeChatOptions() {
+  document.querySelector(
+    ".chatx-options-overlay"
+  )?.remove();
+}
+
+function openChatOptions() {
+  if (!activeChatId) return;
+
+  closeChatOptions();
+
+  const overlay = document.createElement("div");
+  overlay.className = "chatx-options-overlay";
+
+  const card = document.createElement("div");
+  card.className = "chatx-options-card";
+
+  const title = document.createElement("h3");
+  title.textContent = "Chat Options ⋮";
+
+  const description = document.createElement("p");
+  description.textContent =
+    activeChatUser?.displayName ||
+    "Manage conversation";
+
+  const clearBtn = document.createElement("button");
+  clearBtn.className = "chatx-option-btn";
+  clearBtn.textContent = "🧹 Clear Chat";
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className =
+    "chatx-option-btn chatx-option-danger";
+  deleteBtn.textContent = "🗑️ Delete Chat";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className =
+    "chatx-option-btn chatx-option-cancel";
+  cancelBtn.textContent = "Cancel";
+
+  clearBtn.onclick = () => {
+    closeChatOptions();
+    clearCurrentChat();
+  };
+
+  deleteBtn.onclick = () => {
+    closeChatOptions();
+    deleteCurrentChat();
+  };
+
+  cancelBtn.onclick = closeChatOptions;
+
+  overlay.onclick = event => {
+    if (event.target === overlay) {
+      closeChatOptions();
+    }
+  };
+
+  card.append(
+    title,
+    description,
+    clearBtn,
+    deleteBtn,
+    cancelBtn
+  );
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+}
+
+$("chatInfoBtn").addEventListener(
+  "click",
+  openChatOptions
+);
 
 /* ========== NOTIFICATION SOUND ========== */
 
@@ -340,19 +587,20 @@ function playNotificationSound() {
     );
 
   } catch (error) {
-    console.warn("Notification sound unavailable:", error);
+    console.warn("Sound unavailable:", error);
   }
 }
 
 document.addEventListener("click", () => {
-  if (!audioContext) return;
-
-  if (audioContext.state === "suspended") {
+  if (
+    audioContext &&
+    audioContext.state === "suspended"
+  ) {
     audioContext.resume().catch(() => {});
   }
 });
 
-/* ========== SHOW NOTIFICATION ========== */
+/* ========== NOTIFICATIONS ========== */
 
 function showNotification(title, message, onClick) {
   document.querySelectorAll(".chatx-notification")
@@ -370,51 +618,20 @@ function showNotification(title, message, onClick) {
   box.append(heading, description);
 
   if (typeof onClick === "function") {
-    box.addEventListener("click", () => {
+    box.onclick = () => {
       box.remove();
       onClick();
-    });
+    };
   }
 
   document.body.appendChild(box);
 
   playNotificationSound();
 
-  setTimeout(() => {
-    box.remove();
-  }, 4500);
+  setTimeout(() => box.remove(), 4500);
 }
 
-/* ========== UNREAD TRACKING ========== */
-
-function readKey(chatId) {
-  return `chatx_read_${currentUser?.uid}_${chatId}`;
-}
-
-function getLastRead(chatId) {
-  try {
-    return Number(
-      localStorage.getItem(readKey(chatId))
-    ) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-function markChatRead(chatId) {
-  if (!currentUser || !chatId) return;
-
-  try {
-    localStorage.setItem(
-      readKey(chatId),
-      String(Date.now())
-    );
-  } catch (error) {
-    console.warn(error);
-  }
-
-  renderChats($("searchInput").value);
-}
+/* ========== UNREAD ========== */
 
 function isUnread(chat) {
   if (!currentUser) return false;
@@ -430,7 +647,10 @@ function isUnread(chat) {
   }
 
   return getTimestamp(chat.updatedAt) >
-    getLastRead(chat.id);
+    Math.max(
+      getLastRead(chat.id),
+      getDeleteTime(chat.id)
+    );
 }
 
 /* ========== AUTH STATE ========== */
@@ -447,9 +667,11 @@ onAuthStateChanged(auth, async user => {
   registeredUsers = [];
   conversations = [];
   stories = [];
+  currentMessages = [];
 
   activeChatId = null;
   activeChatUser = null;
+  activeStoryId = null;
 
   knownChatUpdates.clear();
   notificationsReady = false;
@@ -464,7 +686,6 @@ onAuthStateChanged(auth, async user => {
 
     renderStories();
     showScreen(homeScreen);
-
     return;
   }
 
@@ -495,7 +716,6 @@ onAuthStateChanged(auth, async user => {
 
 async function createUserProfile(user) {
   const userRef = doc(db, "users", user.uid);
-
   const snapshot = await getDoc(userRef);
 
   const name = getDisplayName(user);
@@ -543,7 +763,7 @@ function startUsersListener() {
   );
 }
 
-/* ========== CONVERSATIONS LISTENER ========== */
+/* ========== CHAT LISTENER ========== */
 
 function startChatsListener() {
   const myUid = currentUser.uid;
@@ -587,14 +807,12 @@ function startChatsListener() {
             !snapshot.metadata.fromCache &&
             !snapshot.metadata.hasPendingWrites
           ) {
-            const otherId =
-              getOtherUserId(chat);
+            const otherId = getOtherUserId(chat);
 
-            const person =
-              findUser(otherId) || {
-                uid: otherId,
-                displayName: getChatName(chat)
-              };
+            const person = findUser(otherId) || {
+              uid: otherId,
+              displayName: getChatName(chat)
+            };
 
             showNotification(
               getChatName(chat),
@@ -682,10 +900,18 @@ function renderChats(search = "") {
 
   chatList.innerHTML = "";
 
-  $("chatCount").textContent =
-    `${conversations.length} chats`;
+  const visibleChats = conversations.filter(chat => {
+    const deletedAt = getDeleteTime(chat.id);
 
-  const filtered = conversations.filter(
+    if (!deletedAt) return true;
+
+    return getTimestamp(chat.updatedAt) > deletedAt;
+  });
+
+  $("chatCount").textContent =
+    `${visibleChats.length} chats`;
+
+  const filtered = visibleChats.filter(
     chat => getChatName(chat)
       .toLowerCase()
       .includes(search.toLowerCase())
@@ -698,7 +924,6 @@ function renderChats(search = "") {
         ? "No matching conversations found."
         : "No conversations yet. Tap + to start chatting!"
     );
-
     return;
   }
 
@@ -720,9 +945,18 @@ function renderChats(search = "") {
     title.textContent = name;
 
     const preview = document.createElement("p");
+
+    const clearedAt = Math.max(
+      getClearTime(chat.id),
+      getDeleteTime(chat.id)
+    );
+
     preview.textContent =
-      chat.lastMessage ||
-      "Start your conversation ✨";
+      clearedAt &&
+      getTimestamp(chat.updatedAt) <= clearedAt
+        ? "No messages"
+        : chat.lastMessage ||
+          "Start your conversation ✨";
 
     details.append(title, preview);
 
@@ -730,8 +964,7 @@ function renderChats(search = "") {
     meta.className = "chat-meta";
 
     const time = document.createElement("time");
-    time.textContent =
-      formatTime(chat.updatedAt);
+    time.textContent = formatTime(chat.updatedAt);
 
     meta.appendChild(time);
 
@@ -744,14 +977,14 @@ function renderChats(search = "") {
 
     item.append(avatar, details, meta);
 
-    item.addEventListener("click", () => {
+    item.onclick = () => {
       const person = findUser(otherId) || {
         uid: otherId,
         displayName: name
       };
 
       openChatWithUser(person);
-    });
+    };
 
     chatList.appendChild(item);
   });
@@ -784,7 +1017,6 @@ function renderPeople(search = "") {
         ? "No matching users found."
         : "No registered users found yet."
     );
-
     return;
   }
 
@@ -808,12 +1040,9 @@ function renderPeople(search = "") {
     status.textContent = "Tap to start chatting";
 
     details.append(name, status);
-
     item.append(avatar, details);
 
-    item.addEventListener("click", () => {
-      openChatWithUser(person);
-    });
+    item.onclick = () => openChatWithUser(person);
 
     peopleList.appendChild(item);
   });
@@ -826,20 +1055,12 @@ function showNewChatModal() {
   openModal("newChatModal");
 }
 
-$("newChatBtn").addEventListener(
-  "click",
-  showNewChatModal
-);
+$("newChatBtn").onclick = showNewChatModal;
+$("addPersonBtn").onclick = showNewChatModal;
 
-$("addPersonBtn").addEventListener(
-  "click",
-  showNewChatModal
-);
-
-$("cancelNewChat").addEventListener(
-  "click",
-  () => closeModal("newChatModal")
-);
+$("cancelNewChat").onclick = () => {
+  closeModal("newChatModal");
+};
 
 $("newChatForm").addEventListener(
   "submit",
@@ -939,6 +1160,7 @@ async function openChatWithUser(person) {
 
     activeChatId = chatId;
     activeChatUser = person;
+    currentMessages = [];
 
     $("chatUsername").textContent =
       person.displayName || "ChatX User";
@@ -962,7 +1184,7 @@ async function openChatWithUser(person) {
   }
 }
 
-/* ========== MESSAGES LISTENER ========== */
+/* ========== MESSAGE LISTENER ========== */
 
 function startMessagesListener(chatId) {
   const messagesQuery = query(
@@ -981,315 +1203,72 @@ function startMessagesListener(chatId) {
     snapshot => {
       if (activeChatId !== chatId) return;
 
-      const messages = snapshot.docs.map(item => ({
+      currentMessages = snapshot.docs.map(item => ({
         id: item.id,
         ...item.data()
-     d,
-        displayName: name
-      };
+      }));
 
-      openChatWithUser(person);
-    });
-
-    chatList.appendChild(item);
-  });
-}
-
-/* ---------- PEOPLE DIRECTORY ---------- */
-
-function renderPeople(search = "") {
-  if (!peopleList || !currentUser) return;
-
-  peopleList.innerHTML = "";
-
-  const allPeople = registeredUsers.filter(
-    user => user.uid !== currentUser.uid
-  );
-
-  const people = allPeople.filter(
-    user => (user.displayName || "")
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
-
-  $("peopleCount").textContent =
-    `${allPeople.length} people`;
-
-  if (people.length === 0) {
-    showEmpty(
-      peopleList,
-      search
-        ? "No matching users found."
-        : "No registered users found yet."
-    );
-
-    return;
-  }
-
-  people.forEach(person => {
-    const item = document.createElement("div");
-    item.className = "chat-item";
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-
-    avatar.textContent =
-      getInitial(person.displayName);
-
-    const details = document.createElement("div");
-    details.className = "chat-details";
-
-    const name = document.createElement("h3");
-    name.textContent =
-      person.displayName || "ChatX User";
-
-    const status = document.createElement("p");
-    status.textContent = "Tap to start chatting";
-
-    details.append(name, status);
-
-    item.append(avatar, details);
-
-    item.addEventListener("click", () => {
-      openChatWithUser(person);
-    });
-
-    peopleList.appendChild(item);
-  });
-}
-
-/* ---------- NEW CHAT ---------- */
-
-function showNewChatModal() {
-  $("newChatName").value = "";
-  openModal("newChatModal");
-}
-
-$("newChatBtn").addEventListener(
-  "click",
-  showNewChatModal
-);
-
-$("addPersonBtn").addEventListener(
-  "click",
-  showNewChatModal
-);
-
-$("cancelNewChat").addEventListener(
-  "click",
-  () => closeModal("newChatModal")
-);
-
-$("newChatForm").addEventListener(
-  "submit",
-  async event => {
-    event.preventDefault();
-
-    if (!currentUser) return;
-
-    const name = $("newChatName").value
-      .trim()
-      .toLowerCase();
-
-    if (!name) return;
-
-    const matches = registeredUsers.filter(
-      user =>
-        user.uid !== currentUser.uid &&
-        (user.displayName || "")
-          .toLowerCase() === name
-    );
-
-    if (matches.length === 0) {
-      alert(
-        "User not found. Your friend must create a ChatX account first."
-      );
-      return;
-    }
-
-    if (matches.length > 1) {
-      alert(
-        "Multiple users have this name. Please select your friend from the People section."
-      );
-      return;
-    }
-
-    closeModal("newChatModal");
-
-    await openChatWithUser(matches[0]);
-  }
-);
-
-/* ---------- CREATE OR OPEN CHAT ---------- */
-
-async function openChatWithUser(person) {
-  if (!currentUser || !person?.uid) return;
-
-  if (person.uid === currentUser.uid) {
-    alert("You cannot chat with yourself.");
-    return;
-  }
-
-  const myUid = currentUser.uid;
-  const thisSession = sessionVersion;
-
-  const participants = [
-    myUid,
-    person.uid
-  ].sort();
-
-  const chatId = participants.join("__");
-
-  const chatRef = doc(
-    db,
-    "conversations",
-    chatId
-  );
-
-  try {
-    const snapshot = await getDoc(chatRef);
-
-    if (
-      thisSession !== sessionVersion ||
-      currentUser?.uid !== myUid
-    ) {
-      return;
-    }
-
-    if (!snapshot.exists()) {
-      await setDoc(chatRef, {
-        participants,
-        participantNames: {
-          [myUid]: getDisplayName(currentUser),
-          [person.uid]:
-            person.displayName || "ChatX User"
-        },
-        lastMessage: "",
-        updatedAt: serverTimestamp()
-      });
-    }
-
-    if (
-      thisSession !== sessionVersion ||
-      currentUser?.uid !== myUid
-    ) {
-      return;
-    }
-
-    if (messagesUnsubscribe) {
-      messagesUnsubscribe();
-      messagesUnsubscribe = null;
-    }
-
-    activeChatId = chatId;
-    activeChatUser = person;
-
-    $("chatUsername").textContent =
-      person.displayName || "ChatX User";
-
-    $("chatAvatar").textContent =
-      getInitial(person.displayName);
-
-    $("chatStatus").textContent =
-      "Real-time conversation";
-
-    $("messageInput").value = "";
-
-    messagesBox.innerHTML = "";
-
-    showScreen(chatScreen);
-
-    startMessagesListener(chatId);
-
-  } catch (error) {
-    reportError(error, "Opening chat");
-  }
-}
-
-/* ---------- MESSAGES LISTENER ---------- */
-
-function startMessagesListener(chatId) {
-  const messagesQuery = query(
-    collection(
-      db,
-      "conversations",
-      chatId,
-      "messages"
-    ),
-    orderBy("createdAt", "asc")
-  );
-
-  messagesUnsubscribe = onSnapshot(
-    messagesQuery,
-
-    snapshot => {
-      if (activeChatId !== chatId) return;
-
-      const messages = snapshot.docs.map(
-        item => ({
-          id: item.id,
-          ...item.data()
-        })
-      );
-
-      renderMessages(messages);
+      renderMessages(currentMessages);
+      markChatRead(chatId);
     },
 
-    error => {
-      reportError(error, "Loading messages");
-    }
+    error => reportError(error, "Loading messages")
   );
 }
 
-/* ---------- RENDER MESSAGES ---------- */
+/* ========== RENDER MESSAGES ========== */
 
 function renderMessages(messages = []) {
   messagesBox.innerHTML = "";
 
-  if (messages.length === 0) {
+  if (!activeChatId) return;
+
+  const hiddenUntil = Math.max(
+    getClearTime(activeChatId),
+    getDeleteTime(activeChatId)
+  );
+
+  const visibleMessages = messages.filter(
+    message =>
+      getTimestamp(message.createdAt) > hiddenUntil
+  );
+
+  if (!visibleMessages.length) {
     showEmpty(
       messagesBox,
       "Your conversation starts here. Send a message!"
     );
-
     return;
   }
 
-  messages.forEach(message => {
+  visibleMessages.forEach(message => {
     const bubble = document.createElement("div");
 
     const isMine =
       message.senderId === currentUser?.uid;
 
     bubble.className =
-      `message ${isMine ? "sent" : "received"}`;
+      "message " +
+      (isMine ? "sent" : "received");
 
     const text = document.createElement("div");
+    text.className = "message-text";
     text.textContent = message.text || "";
 
-    const time = document.createElement("span");
+    const time = document.createElement("small");
     time.className = "message-time";
-
-    time.textContent = formatTime(
-      message.createdAt
-    );
+    time.textContent =
+      formatTime(message.createdAt);
 
     bubble.append(text, time);
-
     messagesBox.appendChild(bubble);
   });
 
-  const container = document.querySelector(
-    ".chat-background"
-  );
-
-  if (container) {
-    container.scrollTop =
-      container.scrollHeight;
-  }
+  messagesBox.scrollTop =
+    messagesBox.scrollHeight;
 }
 
-/* ---------- SEND MESSAGE ---------- */
+/* ========== SEND MESSAGE ========== */
 
 $("messageForm").addEventListener(
   "submit",
@@ -1303,18 +1282,17 @@ $("messageForm").addEventListener(
     const input = $("messageInput");
     const text = input.value.trim();
 
-    if (!text || text.length > 2000) {
-      return;
-    }
+    if (!text) return;
 
     const chatId = activeChatId;
     const senderId = currentUser.uid;
-    const thisSession = sessionVersion;
 
-    const sendButton = $("messageForm")
-      .querySelector('button[type="submit"]');
+    const button =
+      event.currentTarget.querySelector(
+        'button[type="submit"]'
+      );
 
-    sendButton.disabled = true;
+    if (button) button.disabled = true;
 
     try {
       await addDoc(
@@ -1331,104 +1309,279 @@ $("messageForm").addEventListener(
         }
       );
 
-      if (
-        thisSession === sessionVersion &&
-        activeChatId === chatId
-      ) {
-        input.value = "";
-      }
-
       await updateDoc(
         doc(db, "conversations", chatId),
         {
           lastMessage: text,
+          lastSenderId: senderId,
           updatedAt: serverTimestamp()
         }
       );
+
+      if (activeChatId === chatId) {
+        input.value = "";
+        markChatRead(chatId);
+      }
 
     } catch (error) {
       reportError(error, "Sending message");
 
     } finally {
-      sendButton.disabled = false;
+      if (button) button.disabled = false;
     }
   }
 );
 
-/* ---------- CHAT NAVIGATION ---------- */
+/* ========== SHARED STORIES ========== */
 
-function goHome() {
-  activeChatId = null;
-  activeChatUser = null;
+function startStoriesListener() {
+  const myUid = currentUser.uid;
 
-  if (messagesUnsubscribe) {
-    messagesUnsubscribe();
-    messagesUnsubscribe = null;
-  }
+  storiesUnsubscribe = onSnapshot(
+    collection(db, "stories"),
 
-  selectTab("chatsTab");
-  showScreen(homeScreen);
+    snapshot => {
+      if (currentUser?.uid !== myUid) {
+        return;
+      }
 
-  renderChats(
-    $("searchInput").value
+      stories = snapshot.docs.map(item => ({
+        id: item.id,
+        ...item.data()
+      }));
+
+      renderStories();
+    },
+
+    error => reportError(error, "Loading stories")
+  );
+
+  storyRefreshInterval = setInterval(() => {
+    renderStories();
+
+    if (
+      activeStoryId &&
+      !getActiveStories().some(
+        story => story.id === activeStoryId
+      )
+    ) {
+      closeStoryViewer();
+    }
+  }, 30000);
+}
+
+function getActiveStories() {
+  const now = Date.now();
+
+  return stories.filter(story => {
+    const createdAt =
+      getTimestamp(story.createdAt);
+
+    if (!createdAt) return false;
+
+    return (
+      createdAt <= now &&
+      now - createdAt < STORY_DURATION
+    );
+  }).sort(
+    (a, b) =>
+      getTimestamp(b.createdAt) -
+      getTimestamp(a.createdAt)
   );
 }
 
-$("backBtn").addEventListener(
-  "click",
-  goHome
-);
+function renderStories() {
+  if (!storiesList) return;
 
-$("chatInfoBtn").addEventListener(
-  "click",
-  () => {
-    alert(
-      "ChatX Real-Time Chat\n\n" +
-      "Friend: " +
-      (activeChatUser?.displayName || "Unknown") +
-      "\n\nMessages are stored in Firebase Firestore.\n" +
-      "This app does not currently provide end-to-end encryption."
-    );
+  storiesList.innerHTML = "";
+
+  const addItem = document.createElement("div");
+  addItem.className = "story-item";
+  addItem.id = "addStory";
+
+  const addRing = document.createElement("div");
+  addRing.className = "story-ring add-ring";
+
+  const addAvatar = document.createElement("div");
+  addAvatar.className = "story-avatar";
+  addAvatar.textContent = "+";
+
+  const addLabel = document.createElement("p");
+  addLabel.textContent = "Your Story";
+
+  addRing.appendChild(addAvatar);
+  addItem.append(addRing, addLabel);
+
+  addItem.onclick = () => {
+    if (!currentUser) return;
+
+    $("storyText").value = "";
+    openModal("storyModal");
+  };
+
+  storiesList.appendChild(addItem);
+
+  if (!currentUser) return;
+
+  getActiveStories().forEach(story => {
+    const name =
+      findUser(story.userId)?.displayName ||
+      story.userName ||
+      "ChatX User";
+
+    const item = document.createElement("div");
+    item.className = "story-item chatx-story";
+
+    const ring = document.createElement("div");
+    ring.className = "story-ring";
+
+    const avatar = document.createElement("div");
+    avatar.className = "story-avatar";
+    avatar.textContent = getInitial(name);
+
+    const label = document.createElement("p");
+    label.className = "chatx-story-name";
+
+    label.textContent =
+      story.userId === currentUser.uid
+        ? "You"
+        : name;
+
+    ring.appendChild(avatar);
+    item.append(ring, label);
+
+    item.onclick = () => {
+      openStoryViewer(story);
+    };
+
+    storiesList.appendChild(item);
+  });
+}
+
+/* ========== POST STORY ========== */
+
+$("storyForm").addEventListener(
+  "submit",
+  async event => {
+    event.preventDefault();
+
+    if (!currentUser) return;
+
+    const text = $("storyText").value.trim();
+
+    if (!text) {
+      alert("Write something for your Story.");
+      return;
+    }
+
+    const button =
+      event.currentTarget.querySelector(
+        'button[type="submit"]'
+      );
+
+    if (button) button.disabled = true;
+
+    try {
+      await addDoc(
+        collection(db, "stories"),
+        {
+          userId: currentUser.uid,
+          userName: getDisplayName(currentUser),
+          text,
+          createdAt: serverTimestamp()
+        }
+      );
+
+      $("storyText").value = "";
+      closeModal("storyModal");
+
+      showNotification(
+        "Story posted",
+        "Your Moment is visible to ChatX users."
+      );
+
+    } catch (error) {
+      reportError(error, "Posting story");
+
+    } finally {
+      if (button) button.disabled = false;
+    }
   }
 );
 
-/* ---------- CHAT SEARCH ---------- */
+/* ========== STORY VIEWER ========== */
 
-$("searchInput").addEventListener(
-  "input",
-  event => {
-    renderChats(event.target.value);
+function openStoryViewer(story) {
+  if (!story) return;
+
+  const timestamp =
+    getTimestamp(story.createdAt);
+
+  if (
+    !timestamp ||
+    Date.now() - timestamp >= STORY_DURATION
+  ) {
+    alert("This Story has expired.");
+    return;
   }
-);
 
-/* ---------- PEOPLE NAVIGATION ---------- */
+  clearTimeout(storyTimer);
 
-$("peopleTab").addEventListener(
-  "click",
-  () => {
-    selectTab("peopleTab");
+  activeStoryId = story.id;
 
-    $("peopleSearch").value = "";
+  const name =
+    findUser(story.userId)?.displayName ||
+    story.userName ||
+    "ChatX User";
 
-    renderPeople();
+  $("storyUsername").textContent = name;
 
-    showScreen(peopleScreen);
-  }
-);
+  $("storyUserAvatar").textContent =
+    getInitial(name);
 
-$("peopleBack").addEventListener(
-  "click",
-  goHome
-);
+  $("storyTime").textContent =
+    formatStoryTime(timestamp);
 
-$("peopleSearch").addEventListener(
-  "input",
-  event => {
-    renderPeople(event.target.value);
-  }
-);
+  $("storyContent").textContent =
+    story.text || "";
 
-/* ---------- PROFILE ---------- */
+  const progress = $("storyProgressBar");
+
+  progress.style.transition = "none";
+  progress.style.width = "0%";
+
+  showScreen(storyScreen);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      progress.style.transition =
+        "width 6s linear";
+
+      progress.style.width = "100%";
+    });
+  });
+
+  storyTimer = setTimeout(() => {
+    closeStoryViewer();
+  }, 6000);
+}
+
+function closeStoryViewer() {
+  clearTimeout(storyTimer);
+
+  storyTimer = null;
+  activeStoryId = null;
+
+  goHome();
+}
+
+$("closeStory").onclick = closeStoryViewer;
+
+$("cancelStory").onclick = () => {
+  closeModal("storyModal");
+};
+
+/* ========== PROFILE ========== */
 
 function renderProfile() {
   if (!currentUser) return;
@@ -1442,21 +1595,6 @@ function renderProfile() {
     currentUser.email || "";
 }
 
-function openProfile() {
-  renderProfile();
-  showScreen(profileScreen);
-}
-
-$("profileBtn").addEventListener(
-  "click",
-  openProfile
-);
-
-$("profileBack").addEventListener(
-  "click",
-  goHome
-);
-
 $("saveProfile").addEventListener(
   "click",
   async () => {
@@ -1464,10 +1602,8 @@ $("saveProfile").addEventListener(
 
     const name = $("profileName").value.trim();
 
-    if (name.length < 2 || name.length > 30) {
-      alert(
-        "Name must contain 2 to 30 characters."
-      );
+    if (name.length < 2) {
+      alert("Name must contain at least 2 characters.");
       return;
     }
 
@@ -1482,15 +1618,18 @@ $("saveProfile").addEventListener(
       await updateDoc(
         doc(db, "users", currentUser.uid),
         {
-          uid: currentUser.uid,
           displayName: name,
           updatedAt: serverTimestamp()
         }
       );
 
-      renderProfile();
+      $("displayProfileName").textContent =
+        name;
 
-      alert("Profile saved successfully!");
+      showNotification(
+        "Profile updated",
+        "Your display name has been saved."
+      );
 
     } catch (error) {
       reportError(error, "Saving profile");
@@ -1501,305 +1640,94 @@ $("saveProfile").addEventListener(
   }
 );
 
-/* ---------- STORIES ---------- */
+/* ========== NAVIGATION ========== */
 
-const STORY_DURATION =
-  24 * 60 * 60 * 1000;
-
-function removeExpiredStories() {
-  const now = Date.now();
-
-  const oldLength = appData.stories.length;
-
-  appData.stories = appData.stories.filter(
-    story =>
-      story.createdAt <= now &&
-      now - story.createdAt < STORY_DURATION
-  );
-
-  if (appData.stories.length !== oldLength) {
-    saveData();
-  }
-}
-
-function renderStories() {
-  removeExpiredStories();
-
-  storiesList.innerHTML = "";
-
-  const addItem = document.createElement("div");
-  addItem.className = "story-item";
-
-  addItem.innerHTML = `
-    <div class="story-ring add-ring">
-      <div class="story-avatar">+</div>
-    </div>
-    <p>Your Story</p>
-  `;
-
-  addItem.addEventListener("click", () => {
-    $("storyText").value = "";
-    openModal("storyModal");
-  });
-
-  storiesList.appendChild(addItem);
-
-  const sortedStories = [
-    ...appData.stories
-  ].sort(
-    (a, b) => b.createdAt - a.createdAt
-  );
-
-  sortedStories.forEach(story => {
-    const item = document.createElement("div");
-    item.className = "story-item";
-
-    const ring = document.createElement("div");
-    ring.className = "story-ring";
-
-    const avatar = document.createElement("div");
-    avatar.className = "story-avatar";
-
-    avatar.textContent =
-      getInitial(story.username);
-
-    ring.appendChild(avatar);
-
-    const name = document.createElement("p");
-    name.textContent = story.username;
-
-    item.append(ring, name);
-
-    item.addEventListener("click", () => {
-      openStory(story.id);
-    });
-
-    storiesList.appendChild(item);
-  });
-}
-
-/* ---------- CREATE STORY ---------- */
-
-$("storyForm").addEventListener(
-  "submit",
-  event => {
-    event.preventDefault();
-
-    const text = $("storyText").value.trim();
-
-    if (!text || !currentUser) return;
-
-    const story = {
-      id: makeId(),
-      username: getDisplayName(currentUser),
-      text,
-      createdAt: Date.now()
-    };
-
-    appData.stories.push(story);
-
-    saveData();
-    renderStories();
-
-    closeModal("storyModal");
-
-    openStory(story.id);
-  }
-);
-
-$("cancelStory").addEventListener(
-  "click",
-  () => closeModal("storyModal")
-);
-
-/* ---------- VIEW STORY ---------- */
-
-function openStory(storyId) {
-  removeExpiredStories();
-
-  const story = appData.stories.find(
-    item => item.id === storyId
-  );
-
-  if (!story) {
-    renderStories();
-    return;
+function leaveChat() {
+  if (messagesUnsubscribe) {
+    messagesUnsubscribe();
+    messagesUnsubscribe = null;
   }
 
-  clearInterval(storyTimer);
+  activeChatId = null;
+  activeChatUser = null;
+  currentMessages = [];
 
-  activeStoryId = storyId;
-
-  $("storyUsername").textContent =
-    story.username;
-
-  $("storyUserAvatar").textContent =
-    getInitial(story.username);
-
-  $("storyTime").textContent =
-    formatStoryTime(story.createdAt);
-
-  $("storyContent").textContent =
-    story.text;
-
-  $("storyProgressBar").style.width = "0%";
-
-  showScreen(storyScreen);
-
-  const startTime = Date.now();
-  const viewDuration = 7000;
-
-  storyTimer = setInterval(() => {
-    const elapsed = Date.now() - startTime;
-
-    const progress = Math.min(
-      100,
-      (elapsed / viewDuration) * 100
-    );
-
-    $("storyProgressBar").style.width =
-      `${progress}%`;
-
-    if (progress >= 100) {
-      closeStory();
-    }
-  }, 50);
+  closeChatOptions();
 }
 
-function closeStory() {
-  clearInterval(storyTimer);
+function goHome() {
+  leaveChat();
+
+  clearTimeout(storyTimer);
 
   storyTimer = null;
   activeStoryId = null;
 
   showScreen(homeScreen);
-
-  renderStories();
-
   selectTab("chatsTab");
+
+  if (currentUser) {
+    renderChats($("searchInput").value);
+  }
 }
 
-$("closeStory").addEventListener(
-  "click",
-  closeStory
-);
+function goPeople() {
+  leaveChat();
 
-/* ---------- BOTTOM NAVIGATION ---------- */
+  showScreen(peopleScreen);
+  selectTab("peopleTab");
 
-$("chatsTab").addEventListener(
-  "click",
-  goHome
-);
-
-$("storiesTab").addEventListener(
-  "click",
-  () => {
-    selectTab("storiesTab");
-
-    showScreen(homeScreen);
-    renderStories();
-
-    $("storiesList").scrollIntoView({
-      behavior: "smooth",
-      block: "nearest"
-    });
+  if (currentUser) {
+    renderPeople($("peopleSearch").value);
   }
-);
+}
 
-$("settingsTab").addEventListener(
-  "click",
-  () => {
-    selectTab("settingsTab");
-    openProfile();
-  }
-);
+function goProfile() {
+  leaveChat();
 
-/* ---------- CLOSE MODALS ---------- */
+  renderProfile();
+  showScreen(profileScreen);
+  selectTab("settingsTab");
+}
 
-document.querySelectorAll(".modal")
-  .forEach(modal => {
-    modal.addEventListener(
-      "click",
-      event => {
-        if (event.target === modal) {
-          modal.classList.add("hidden");
-        }
-      }
-    );
+$("backBtn").onclick = goHome;
+$("peopleBack").onclick = goHome;
+$("profileBack").onclick = goHome;
+$("profileBtn").onclick = goProfile;
+
+$("chatsTab").onclick = goHome;
+$("peopleTab").onclick = goPeople;
+$("settingsTab").onclick = goProfile;
+
+$("storiesTab").onclick = () => {
+  goHome();
+
+  $("storiesList")?.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
   });
+};
 
-/* ---------- ANDROID BACK BUTTON ---------- */
+/* ========== SEARCH ========== */
 
-document.addEventListener(
-  "keydown",
+$("searchInput").addEventListener(
+  "input",
   event => {
-    if (event.key !== "Escape") return;
-
-    const visibleModal =
-      document.querySelector(
-        ".modal:not(.hidden)"
-      );
-
-    if (visibleModal) {
-      visibleModal.classList.add("hidden");
-      return;
-    }
-
-    if (
-      storyScreen.classList.contains("active")
-    ) {
-      closeStory();
-      return;
-    }
-
-    if (
-      chatScreen.classList.contains("active") ||
-      profileScreen.classList.contains("active") ||
-      peopleScreen.classList.contains("active")
-    ) {
-      goHome();
-    }
+    renderChats(event.target.value);
   }
 );
 
-/* ---------- STORY EXPIRATION ---------- */
-
-setInterval(() => {
-  const previousCount = appData.stories.length;
-
-  removeExpiredStories();
-
-  if (
-    previousCount !== appData.stories.length
-  ) {
-    renderStories();
-
-    if (activeStoryId) {
-      const exists = appData.stories.some(
-        story => story.id === activeStoryId
-      );
-
-      if (!exists) {
-        closeStory();
-      }
-    }
+$("peopleSearch").addEventListener(
+  "input",
+  event => {
+    renderPeople(event.target.value);
   }
-}, 60000);
-
-/* ---------- INITIAL UI ---------- */
-
-removeExpiredStories();
-
-renderStories();
-
-showEmpty(
-  chatList,
-  "Sign in to load your conversations."
 );
 
-selectTab("chatsTab");
+/* ========== INITIAL UI ========== */
+
 showScreen(homeScreen);
 
 console.log(
-  "ChatX Midnight Aurora v2.0 loaded."
+  "ChatX Midnight Aurora v3.2 loaded successfully."
 );
