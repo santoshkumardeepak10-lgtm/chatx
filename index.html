@@ -1,0 +1,720 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#080d1b">
+  <title>ChatX | Connect Beyond</title>
+  <link rel="stylesheet" href="style.css">  <style>
+    body.auth-locked .app {
+      display: none !important;
+    }
+
+    #authScreen {
+      min-height: 100vh;
+      box-sizing: border-box;
+      padding: 28px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(ellipse at top, #172b52 0%, transparent 55%),
+        linear-gradient(145deg, #080d1b, #10172b 60%, #080d1b);
+      color: #f4f7ff;
+      font-family: Arial, sans-serif;
+    }
+
+    #authScreen[hidden] {
+      display: none !important;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 390px;
+      box-sizing: border-box;
+      padding: 28px 22px;
+      border: 1px solid rgba(160, 184, 255, .2);
+      border-radius: 25px;
+      background: rgba(18, 27, 49, .92);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .35);
+    }
+
+    .auth-brand {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .auth-logo {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 12px;
+      border-radius: 21px;
+      display: grid;
+      place-items: center;
+      font-size: 34px;
+      color: white;
+      background: linear-gradient(135deg, #7c5cff, #20c9e8);
+      box-shadow: 0 8px 30px rgba(87, 109, 255, .3);
+    }
+
+    .auth-brand h1 {
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: -.8px;
+    }
+
+    .auth-brand h1 span {
+      color: #6fcbff;
+    }
+
+    .auth-brand p {
+      margin: 7px 0 0;
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: #9eafd0;
+    }
+
+    .auth-title {
+      margin: 0 0 8px;
+      font-size: 25px;
+    }
+
+    .auth-description {
+      color: #aebbd4;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0 0 22px;
+    }
+
+    .auth-form label {
+      display: block;
+      margin: 15px 0 8px;
+      color: #dce6ff;
+      font-size: 13px;
+    }
+
+    .auth-form input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid #344461;
+      outline: none;
+      color: #fff;
+      background: #0b1325;
+      font-size: 15px;
+    }
+
+    .auth-form input:focus {
+      border-color: #6fcbff;
+      box-shadow: 0 0 0 3px rgba(111, 203, 255, .12);
+    }
+
+    .auth-primary {
+      width: 100%;
+      border: none;
+      border-radius: 13px;
+      padding: 15px;
+      margin-top: 22px;
+      background: linear-gradient(100deg, #7557ff, #24bfe8);
+      color: white;
+      font-weight: bold;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    .auth-primary:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+
+    .auth-switch {
+      text-align: center;
+      color: #aebbd4;
+      font-size: 14px;
+      margin: 22px 0 0;
+    }
+
+    .auth-switch button,
+    .auth-forgot {
+      border: none;
+      padding: 0;
+      background: transparent;
+      color: #79d4ff;
+      font-size: inherit;
+      cursor: pointer;
+    }
+
+    .auth-forgot {
+      display: block;
+      margin: 16px 0 0 auto;
+      font-size: 13px;
+    }
+
+    .auth-message {
+      display: none;
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .auth-message.show {
+      display: block;
+    }
+
+    .auth-message.error {
+      background: rgba(255, 84, 110, .12);
+      color: #ffb7c2;
+      border: 1px solid rgba(255, 84, 110, .3);
+    }
+
+    .auth-message.success {
+      background: rgba(55, 210, 155, .12);
+      color: #9af0cf;
+      border: 1px solid rgba(55, 210, 155, .3);
+    }
+
+    #authLoading {
+      text-align: center;
+      color: #b8c9e8;
+      margin-top: 14px;
+      font-size: 12px;
+    }
+  </style></head><body class="auth-locked">  <!-- LOGIN AND SIGNUP -->  <section id="authScreen">
+    <div class="auth-card">  <div class="auth-brand">
+    <div class="auth-logo">✦</div>
+    <h1>Chat<span>X</span></h1>
+    <p>CONNECT BEYOND</p>
+  </div>
+
+  <!-- LOGIN FORM -->
+  <div id="loginPanel">
+    <h2 class="auth-title">Welcome back</h2>
+    <p class="auth-description">
+      Sign in to continue to your personal ChatX space.
+    </p>
+
+    <form id="loginForm" class="auth-form">
+      <label for="loginEmail">Email address</label>
+      <input
+        id="loginEmail"
+        type="email"
+        autocomplete="email"
+        placeholder="you@example.com"
+        required
+      >
+
+      <label for="loginPassword">Password</label>
+      <input
+        id="loginPassword"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Enter your password"
+        required
+      >
+
+      <button class="auth-primary" type="submit">
+        Login to ChatX
+      </button>
+    </form>
+
+    <button class="auth-forgot" id="forgotPassword" type="button">
+      Forgot password?
+    </button>
+
+    <p class="auth-switch">
+      New to ChatX?
+      <button id="showSignup" type="button">Create account</button>
+    </p>
+  </div>
+
+  <!-- SIGNUP FORM -->
+  <div id="signupPanel" hidden>
+    <h2 class="auth-title">Create account</h2>
+    <p class="auth-description">
+      Join ChatX and create your own personal space.
+    </p>
+
+    <form id="signupForm" class="auth-form">
+      <label for="signupName">Display name</label>
+      <input
+        id="signupName"
+        type="text"
+        autocomplete="name"
+        placeholder="Your name"
+        minlength="2"
+        maxlength="30"
+        required
+      >
+
+      <label for="signupEmail">Email address</label>
+      <input
+        id="signupEmail"
+        type="email"
+        autocomplete="email"
+        placeholder="you@example.com"
+        required
+      >
+
+      <label for="signupPassword">Password</label>
+      <input
+        id="signupPassword"
+        type="password"
+        autocomplete="new-password"
+        minlength="6"
+        placeholder="At least 6 characters"
+        required
+      >
+
+      <label for="signupConfirm">Confirm password</label>
+      <input
+        id="signupConfirm"
+        type="password"
+        autocomplete="new-password"
+        minlength="6"
+        placeholder="Enter password again"
+        required
+      >
+
+      <button class="auth-primary" type="submit">
+        Create my account
+      </button>
+    </form>
+
+    <p class="auth-switch">
+      Already have an account?
+      <button id="showLogin" type="button">Login</button>
+    </p>
+  </div>
+
+  <div id="authMessage" class="auth-message" role="status" aria-live="polite"></div>
+  <div id="authLoading" hidden>Checking your account...</div>
+
+</div>
+
+  </section>  <!-- EXISTING CHATX APP -->  <div class="app"><!-- HOME SCREEN -->
+<section id="homeScreen" class="screen active">
+
+  <header class="header">
+    <div class="brand">
+      <div class="logo">✦</div>
+      <div>
+        <h1>Chat<span>X</span></h1>
+        <p>CONNECT BEYOND</p>
+      </div>
+    </div>
+
+    <button class="icon-btn" id="profileBtn">☻</button>
+  </header>
+
+  <div class="welcome">
+    <p>YOUR PERSONAL SPACE</p>
+    <h2>Messages<span>.</span></h2>
+  </div>
+
+  <div class="search-box">
+    <span>⌕</span>
+    <input type="search" id="searchInput" placeholder="Search conversations...">
+  </div>
+
+  <div class="stories-section">
+    <div class="section-heading">
+      <h3>Moments ✨</h3>
+      <span>24h stories</span>
+    </div>
+
+    <div class="stories-list" id="storiesList">
+      <div class="story-item" id="addStory">
+        <div class="story-ring add-ring">
+          <div class="story-avatar">+</div>
+        </div>
+        <p>Your Story</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-heading chats-heading">
+    <h3>Recent Chats</h3>
+    <span id="chatCount">0 chats</span>
+  </div>
+
+  <div id="chatList" class="chat-list"></div>
+
+  <button class="new-chat-btn" id="newChatBtn">+</button>
+
+  <nav class="bottom-nav">
+    <button class="nav-item selected" id="chatsTab">
+      <span>◉</span><small>Chats</small>
+    </button>
+    <button class="nav-item" id="storiesTab">
+      <span>◎</span><small>Moments</small>
+    </button>
+    <button class="nav-item" id="peopleTab">
+      <span>♧</span><small>People</small>
+    </button>
+    <button class="nav-item" id="settingsTab">
+      <span>⚙</span><small>Settings</small>
+    </button>
+  </nav>
+</section>
+
+
+<!-- PEOPLE SCREEN -->
+<section id="peopleScreen" class="screen">
+  <header class="page-header">
+    <button class="back-btn" id="peopleBack">‹</button>
+    <h2>Discover People ✨</h2>
+  </header>
+
+  <div class="search-box">
+    <span>⌕</span>
+    <input type="search" id="peopleSearch" placeholder="Search friends...">
+  </div>
+
+  <div class="section-heading">
+    <h3>Your Friends</h3>
+    <span id="peopleCount">0 people</span>
+  </div>
+
+  <div id="peopleList" class="chat-list"></div>
+  <button class="new-chat-btn" id="addPersonBtn">+</button>
+</section>
+
+
+<!-- CHAT SCREEN -->
+<section id="chatScreen" class="screen">
+  <header class="chat-header">
+    <button class="back-btn" id="backBtn">‹</button>
+    <div id="chatAvatar" class="avatar"></div>
+
+    <div class="chat-user-info">
+      <h3 id="chatUsername">Username</h3>
+      <p id="chatStatus">Conversation</p>
+    </div>
+
+    <button class="icon-btn" id="chatInfoBtn">⋮</button>
+  </header>
+
+  <div class="chat-background">
+    <div class="encryption-note">✦ Welcome to your ChatX conversation</div>
+    <div id="messages" class="messages"></div>
+  </div>
+
+  <form id="messageForm" class="message-form">
+    <input
+      type="text"
+      id="messageInput"
+      placeholder="Write a message..."
+      autocomplete="off"
+      maxlength="2000"
+      required
+    >
+    <button type="submit" class="send-btn">➤</button>
+  </form>
+</section>
+
+
+<!-- STORY VIEWER -->
+<section id="storyScreen" class="screen">
+  <div class="story-viewer">
+    <div class="story-progress">
+      <div id="storyProgressBar"></div>
+    </div>
+
+    <div class="story-top">
+      <div id="storyUserAvatar" class="avatar">✦</div>
+
+      <div>
+        <h3 id="storyUsername">Your Story</h3>
+        <p id="storyTime">Just now</p>
+      </div>
+
+      <button class="story-close" id="closeStory">✕</button>
+    </div>
+
+    <div id="storyContent" class="story-content">✨</div>
+  </div>
+</section>
+
+
+<!-- PROFILE SCREEN -->
+<section id="profileScreen" class="screen">
+  <header class="page-header">
+    <button class="back-btn" id="profileBack">‹</button>
+    <h2>My Profile</h2>
+  </header>
+
+  <div class="profile-card">
+    <div class="profile-avatar">✦</div>
+
+    <h2 id="displayProfileName">ChatX User</h2>
+    <p>Your space. Your identity.</p>
+
+    <label for="profileName">Display Name</label>
+    <input
+      type="text"
+      id="profileName"
+      placeholder="Enter your name"
+      maxlength="30"
+    >
+
+    <button id="saveProfile" class="primary-btn">Save Profile</button>
+
+    <p id="accountEmail" style="overflow-wrap:anywhere"></p>
+
+    <button
+      id="logoutBtn"
+      class="secondary-btn"
+      type="button"
+      style="margin-top:18px"
+    >Log Out</button>
+  </div>
+
+  <div class="settings-card">
+    <h3>About ChatX</h3>
+    <p>Midnight Aurora Edition</p>
+    <p>Version 1.0</p>
+  </div>
+</section>
+
+
+<!-- NEW CHAT MODAL -->
+<div id="newChatModal" class="modal hidden">
+  <div class="modal-card">
+    <h2>New Conversation ✦</h2>
+    <p>Start a new conversation.</p>
+
+    <form id="newChatForm">
+      <input
+        type="text"
+        id="newChatName"
+        placeholder="Friend's name"
+        maxlength="30"
+        required
+      >
+
+      <div class="modal-actions">
+        <button type="button" id="cancelNewChat" class="secondary-btn">Cancel</button>
+        <button type="submit" class="primary-btn">Create Chat</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- ADD STORY MODAL -->
+<div id="storyModal" class="modal hidden">
+  <div class="modal-card">
+    <h2>Create Moment ✨</h2>
+    <p>Share something with your friends.</p>
+
+    <form id="storyForm">
+      <textarea
+        id="storyText"
+        placeholder="What's on your mind?"
+        maxlength="300"
+        required
+      ></textarea>
+
+      <div class="modal-actions">
+        <button type="button" id="cancelStory" class="secondary-btn">Cancel</button>
+        <button type="submit" class="primary-btn">Post Story</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+</div>
+<!-- EXISTING LOCAL APP SCRIPT -->
+<script type="module" src="script.js"></script>
+
+<!-- FIREBASE AUTHENTICATION -->
+<script type="module">
+    import { initializeApp }
+      from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      onAuthStateChanged,
+      signOut,
+      updateProfile,
+      sendPasswordResetEmail
+    } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAeOr_hpbi22EHQ3w1RakU-WUASEIif1A",
+      authDomain: "chatx-b1cea.firebaseapp.com",
+      projectId: "chatx-b1cea",
+      storageBucket: "chatx-b1cea.firebasestorage.app",
+      messagingSenderId: "784164213926",
+      appId: "1:784164213926:web:83cd1aafdba8c539689067",
+      measurementId: "G-MM7342DKW0"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+
+    const authScreen = document.getElementById("authScreen");
+    const loginPanel = document.getElementById("loginPanel");
+    const signupPanel = document.getElementById("signupPanel");
+    const authMessage = document.getElementById("authMessage");
+    const authLoading = document.getElementById("authLoading");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    function showMessage(message, type = "error") {
+      authMessage.textContent = message;
+      authMessage.className = "auth-message show " + type;
+    }
+
+    function clearMessage() {
+      authMessage.textContent = "";
+      authMessage.className = "auth-message";
+    }
+
+    function setBusy(form, busy) {
+      const button = form.querySelector('button[type="submit"]');
+      if (button) {
+        button.disabled = busy;
+        button.dataset.originalText ||= button.textContent;
+        button.textContent = busy ? "Please wait..." : button.dataset.originalText;
+      }
+    }
+
+    function friendlyError(error) {
+      const messages = {
+        "auth/email-already-in-use": "This email already has an account. Please log in.",
+        "auth/invalid-email": "Please enter a valid email address.",
+        "auth/weak-password": "Use a stronger password with at least 6 characters.",
+        "auth/invalid-credential": "Email or password is incorrect.",
+        "auth/user-not-found": "No account found. Please create an account first.",
+        "auth/wrong-password": "Email or password is incorrect.",
+        "auth/too-many-requests": "Too many attempts. Please wait and try again.",
+        "auth/network-request-failed": "Network problem. Check your internet connection.",
+        "auth/operation-not-allowed": "Email/Password sign-in is not enabled in Firebase.",
+        "auth/unauthorized-domain": "This website domain is not authorized in Firebase Authentication."
+      };
+
+      return messages[error.code] || "Something went wrong. Please try again. (" + (error.code || "unknown") + ")";
+    }
+
+    document.getElementById("showSignup").addEventListener("click", () => {
+      clearMessage();
+      loginPanel.hidden = true;
+      signupPanel.hidden = false;
+    });
+
+    document.getElementById("showLogin").addEventListener("click", () => {
+      clearMessage();
+      signupPanel.hidden = true;
+      loginPanel.hidden = false;
+    });
+
+    document.getElementById("signupForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const form = event.currentTarget;
+      const name = document.getElementById("signupName").value.trim();
+      const email = document.getElementById("signupEmail").value.trim();
+      const password = document.getElementById("signupPassword").value;
+      const confirmPassword = document.getElementById("signupConfirm").value;
+
+      clearMessage();
+
+      if (name.length < 2) {
+        showMessage("Display name must contain at least 2 characters.");
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        showMessage("Passwords do not match.");
+        return;
+      }
+
+      setBusy(form, true);
+
+      try {
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+
+        await updateProfile(result.user, {
+          displayName: name
+        });
+
+        document.getElementById("profileName").value = name;
+        document.getElementById("displayProfileName").textContent = name;
+
+        showMessage("Account created successfully!", "success");
+      } catch (error) {
+        showMessage(friendlyError(error));
+      } finally {
+        setBusy(form, false);
+      }
+    });
+
+    document.getElementById("loginForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const form = event.currentTarget;
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      clearMessage();
+      setBusy(form, true);
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (error) {
+        showMessage(friendlyError(error));
+      } finally {
+        setBusy(form, false);
+      }
+    });
+
+    document.getElementById("forgotPassword").addEventListener("click", async () => {
+      const email = document.getElementById("loginEmail").value.trim();
+
+      clearMessage();
+
+      if (!email) {
+        showMessage("Enter your email address above first.");
+        return;
+      }
+
+      try {
+        await sendPasswordResetEmail(auth, email);
+        showMessage("If an account exists for this email, a password reset email has been sent.", "success");
+      } catch (error) {
+        showMessage(friendlyError(error));
+      }
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        await signOut(auth);
+      } catch (error) {
+        alert(friendlyError(error));
+      }
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      authLoading.hidden = true;
+
+      if (user) {
+        document.body.classList.remove("auth-locked");
+        authScreen.hidden = true;
+
+        const name = user.displayName || user.email?.split("@")[0] || "ChatX User";
+
+        document.getElementById("displayProfileName").textContent = name;
+        document.getElementById("profileName").value = name;
+        document.getElementById("accountEmail").textContent = user.email || "";
+      } else {
+        document.body.classList.add("auth-locked");
+        authScreen.hidden = false;
+      }
+    });
+  </script></body>
+</html>
