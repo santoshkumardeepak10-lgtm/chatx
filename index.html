@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#080d1b">
 <meta name="description" content="ChatX - Connect Beyond">
-
 <title>ChatX | Connect Beyond</title>
 
 <link rel="stylesheet" href="style.css">
@@ -206,316 +205,866 @@ body.auth-locked .app {
   opacity: .8;
 }
 
-/* Hide inactive screens even if CSS is incomplete */
-.app .screen {
-  display: none;
-}
-
-.app .screen.active {
-  display: block;
-}
-
-.app .modal.hidden {
-  display: none !important;
-}
 </style>
 </head>
 
 <body class="auth-locked">
 
-<!-- ================= AUTH SCREEN ================= -->
-
+<!-- AUTH SCREEN -->
 <section id="authScreen">
 
-  <div class="auth-card">
+<div class="auth-card">
 
-    <div class="auth-brand">
-      <div class="auth-logo">✦</div>
-      <h1>Chat<span>X</span></h1>
-      <p>CONNECT BEYOND</p>
-    </div>
+<div class="auth-brand">
+  <div class="auth-logo">✦</div>
+  <h1>Chat<span>X</span></h1>
+  <p>CONNECT BEYOND</p>
+</div>
 
-    <!-- LOGIN -->
+<!-- LOGIN -->
+<div id="loginPanel">
 
-    <div id="loginPanel">
+<h2 class="auth-title">Welcome back</h2>
 
-      <h2 class="auth-title">Welcome back</h2>
+<p class="auth-description">
+Sign in to continue to your personal ChatX space.
+</p>
 
-      <p class="auth-description">
-        Sign in to continue to your personal ChatX space.
-      </p>
+<a
+class="download-apk-btn"
+href="https://drive.google.com/file/d/1yDrWD0J9CCvJUDKm2_BuNYdDDCx6P9bX/view?usp=drivesdk"
+target="_blank"
+rel="noopener noreferrer">
+📲 Download ChatX APK
+</a>
 
-      <a
-        class="download-apk-btn"
-        href="https://drive.google.com/file/d/1yDrWD0J9CCvJUDKm2_BuNYdDDCx6P9bX/view?usp=drivesdk"
-        target="_blank"
-        rel="noopener noreferrer">
-        📲 Download ChatX APK
-      </a>
+<form id="loginForm" class="auth-form">
 
-      <form id="loginForm" class="auth-form">
+<label for="loginEmail">Email address</label>
 
-        <label for="loginEmail">Email address</label>
-        <input
-          id="loginEmail"
-          type="email"
-          autocomplete="email"
-          placeholder="you@example.com"
-          required>
+<input
+id="loginEmail"
+type="email"
+autocomplete="email"
+placeholder="you@example.com"
+required>
 
-        <label for="loginPassword">Password</label>
-        <input
-          id="loginPassword"
-          type="password"
-          autocomplete="current-password"
-          placeholder="Enter your password"
-          required>
+<label for="loginPassword">Password</label>
 
-        <button type="submit" class="auth-primary">
-          Login to ChatX
-        </button>
+<input
+id="loginPassword"
+type="password"
+autocomplete="current-password"
+placeholder="Enter your password"
+required>
 
-      </form>
+<button type="submit" class="auth-primary">
+Login to ChatX
+</button>
 
-      <button
-        id="forgotPassword"
-        class="auth-forgot"
-        type="button">
-        Forgot password?
-      </button>
+</form>
 
-      <p class="auth-switch">
-        New to ChatX?
-        <button id="showSignup" type="button">
-          Create account
-        </button>
-      </p>
+<button id="forgotPassword" class="auth-forgot" type="button">
+Forgot password?
+</button>
 
-    </div>
+<p class="auth-switch">
+New to ChatX?
+<button id="showSignup" type="button">Create account</button>
+</p>
 
-    <!-- SIGNUP -->
+</div>
 
-    <div id="signupPanel" hidden>
+<!-- SIGNUP -->
+<div id="signupPanel" hidden>
 
-      <h2 class="auth-title">Create account</h2>
+<h2 class="auth-title">Create account</h2>
 
-      <p class="auth-description">
-        Join ChatX and create your personal space.
-      </p>
+<p class="auth-description">
+Join ChatX and create your personal space.
+</p>
 
-      <form id="signupForm" class="auth-form">
+<form id="signupForm" class="auth-form">
 
-        <label for="signupName">Display name</label>
-        <input
-          id="signupName"
-          type="text"
-          autocomplete="name"
-          placeholder="Your name"
-          minlength="2"
-          maxlength="30"
-          required>
+<label for="signupName">Display name</label>
 
-        <label for="signupEmail">Email address</label>
-        <input
-          id="signupEmail"
-          type="email"
-          autocomplete="email"
-          placeholder="you@example.com"
-          required>
+<input
+id="signupName"
+type="text"
+autocomplete="name"
+placeholder="Your name"
+minlength="2"
+maxlength="30"
+required>
 
-        <label for="signupPassword">Password</label>
-        <input
-          id="signupPassword"
-          type="password"
-          autocomplete="new-password"
-          minlength="6"
-          placeholder="At least 6 characters"
-          required>
+<label for="signupEmail">Email address</label>
 
-        <label for="signupConfirm">Confirm password</label>
-        <input
-          id="signupConfirm"
-          type="password"
-          autocomplete="new-password"
-          minlength="6"
-          placeholder="Confirm password"
-          required>
+<input
+id="signupEmail"
+type="email"
+autocomplete="email"
+placeholder="you@example.com"
+required>
 
-        <button type="submit" class="auth-primary">
-          Create my account
-        </button>
+<label for="signupPassword">Password</label>
 
-      </form>
+<input
+id="signupPassword"
+type="password"
+autocomplete="new-password"
+minlength="6"
+placeholder="At least 6 characters"
+required>
 
-      <p class="auth-switch">
-        Already have an account?
-        <button id="showLogin" type="button">
-          Login
-        </button>
-      </p>
+<label for="signupConfirm">Confirm password</label>
 
-    </div>
+<input
+id="signupConfirm"
+type="password"
+autocomplete="new-password"
+minlength="6"
+placeholder="Confirm password"
+required>
 
-    <div
-      id="authMessage"
-      class="auth-message"
-      role="status"
-      aria-live="polite">
-    </div>
+<button type="submit" class="auth-primary">
+Create my account
+</button>
 
-    <div id="authLoading">
-      Connecting to ChatX...
-    </div>
+</form>
 
-  </div>
+<p class="auth-switch">
+Already have an account?
+<button id="showLogin" type="button">Login</button>
+</p>
+
+</div>
+
+<div
+id="authMessage"
+class="auth-message"
+role="status"
+aria-live="polite">
+</div>
+
+<div id="authLoading">
+Connecting to ChatX...
+</div>
+
+</div>
 </section>
 
 
-<!-- ================= MAIN APP ================= -->
-
+<!-- MAIN CHATX APP -->
 <div class="app">
 
-  <!-- HOME -->
+<!-- HOME -->
+<section id="homeScreen" class="screen active">
 
-  <section id="homeScreen" class="screen active">
+<header class="header">
 
-    <header class="header">
+<div class="brand">
+<div class="logo">✦</div>
 
-      <div class="brand">
-        <div class="logo">✦</div>
+<div>
+<h1>Chat<span>X</span></h1>
+<p>CONNECT BEYOND</p>
+</div>
 
-        <div>
-          <h1>Chat<span>X</span></h1>
-          <p>CONNECT BEYOND</p>
-        </div>
-      </div>
+</div>
 
-      <button
-        class="icon-btn"
-        id="profileBtn"
-        type="button">☻</button>
+<button class="icon-btn" id="profileBtn">☻</button>
 
-    </header>
+</header>
 
-    <div class="welcome">
-      <p>YOUR PERSONAL SPACE</p>
-      <h2>Messages<span>.</span></h2>
-    </div>
+<div class="welcome">
+<p>YOUR PERSONAL SPACE</p>
+<h2>Messages<span>.</span></h2>
+</div>
 
-    <div class="search-box">
-      <span>⌕</span>
+<div class="search-box">
+<span>⌕</span>
 
-      <input
-        type="search"
-        id="searchInput"
-        placeholder="Search conversations...">
-    </div>
+<input
+type="search"
+id="searchInput"
+placeholder="Search conversations...">
+</div>
 
-    <div class="stories-section">
+<div class="stories-section">
 
-      <div class="section-heading">
-        <h3>Moments ✨</h3>
-        <span>24h stories</span>
-      </div>
+<div class="section-heading">
+<h3>Moments ✨</h3>
+<span>24h stories</span>
+</div>
 
-      <div class="stories-list" id="storiesList">
+<div class="stories-list" id="storiesList">
 
-        <div class="story-item" id="addStory">
-          <div class="story-ring add-ring">
-            <div class="story-avatar">+</div>
-          </div>
-          <p>Your Story</p>
-        </div>
+<div class="story-item" id="addStory">
+<div class="story-ring add-ring">
+<div class="story-avatar">+</div>
+</div>
+<p>Your Story</p>
+</div>
 
-      </div>
+</div>
+</div>
 
-    </div>
+<div class="section-heading chats-heading">
+<h3>Recent Chats</h3>
+<span id="chatCount">0 chats</span>
+</div>
 
-    <div class="section-heading chats-heading">
-      <h3>Recent Chats</h3>
-      <span id="chatCount">0 chats</span>
-    </div>
+<div id="chatList" class="chat-list"></div>
 
-    <div id="chatList" class="chat-list"></div>
+<button class="new-chat-btn" id="newChatBtn">+</button>
 
-    <button
-      class="new-chat-btn"
-      id="newChatBtn"
-      type="button">+</button>
+<nav class="bottom-nav">
 
-    <nav class="bottom-nav">
+<button class="nav-item selected" id="chatsTab">
+<span>◉</span>
+<small>Chats</small>
+</button>
 
-      <button class="nav-item selected" id="chatsTab">
-        <span>◉</span>
-        <small>Chats</small>
-      </button>
+<button class="nav-item" id="storiesTab">
+<span>◎</span>
+<small>Moments</small>
+</button>
 
-      <button class="nav-item" id="storiesTab">
-        <span>◎</span>
-        <small>Moments</small>
-      </button>
+<button class="nav-item" id="peopleTab">
+<span>♧</span>
+<small>People</small>
+</button>
 
-      <button class="nav-item" id="peopleTab">
-        <span>♧</span>
-        <small>People</small>
-      </button>
+<button class="nav-item" id="settingsTab">
+<span>⚙</span>
+<small>Settings</small>
+</button>
 
-      <button class="nav-item" id="settingsTab">
-        <span>⚙</span>
-        <small>Settings</small>
-      </button>
+</nav>
 
-    </nav>
-
-  </section>
+</section>
 
 
-  <!-- PEOPLE -->
+<!-- PEOPLE -->
+<section id="peopleScreen" class="screen">
 
-  <section id="peopleScreen" class="screen">
+<header class="page-header">
+<button class="back-btn" id="peopleBack">‹</button>
+<h2>Discover People ✨</h2>
+</header>
 
-    <header class="page-header">
-      <button class="back-btn" id="peopleBack">‹</button>
-      <h2>Discover People ✨</h2>
-    </header>
+<div class="search-box">
+<span>⌕</span>
 
-    <div class="search-box">
-      <span>⌕</span>
+<input
+type="search"
+id="peopleSearch"
+placeholder="Search friends...">
+</div>
 
-      <input
-        type="search"
-        id="peopleSearch"
-        placeholder="Search friends...">
-    </div>
+<div class="section-heading">
+<h3>Your Friends</h3>
+<span id="peopleCount">0 people</span>
+</div>
 
-    <div class="section-heading">
-      <h3>Your Friends</h3>
-      <span id="peopleCount">0 people</span>
-    </div>
+<div id="peopleList" class="chat-list"></div>
 
-    <div id="peopleList" class="chat-list"></div>
+<button class="new-chat-btn" id="addPersonBtn">+</button>
 
-    <button
-      class="new-chat-btn"
-      id="addPersonBtn"
-      type="button">+</button>
-
-  </section>
+</section>
 
 
-  <!-- CHAT -->
+<!-- CHAT -->
+<section id="chatScreen" class="screen">
 
-  <section id="chatScreen" class="screen">
+<header class="chat-header">
 
-    <header class="chat-header">
+<button class="back-btn" id="backBtn">‹</button>
 
-      <button class="back-btn" id="backBtn">‹</button>
+<div id="chatAvatar" class="avatar"></div>
 
-      <div id="chatAvatar" class="avatar"></div>
+<div class="chat-user-info">
+<h3 id="chatUsername">Username</h3>
+<p id="chatStatus">Conversation</p>
+</div>
 
-      <div class="chat-user-info">
-        <h3 id="chatUsername">Username</h3>
-        <p id="chatStatus">Conversation</p>
+<button class="icon-btn" id="chatInfoBtn">⋮</button>
+
+</header>
+
+<div class="chat-background">
+
+<div class="encryption-note">
+✦ Welcome to your ChatX conversation
+</div>
+
+<div id="messages" class="messages"></div>
+
+</div>
+
+<form id="messageForm" class="message-form">
+
+<input
+type="text"
+id="messageInput"
+placeholder="Write a message..."
+autocomplete="off"
+maxlength="2000"
+required>
+
+<button type="submit" class="send-btn">➤</button>
+
+</form>
+
+</section>
+
+
+<!-- STORY VIEWER -->
+<section id="storyScreen" class="screen">
+
+<div class="story-viewer">
+
+<div class="story-progress">
+<div id="storyProgressBar"></div>
+</div>
+
+<div class="story-top">
+
+<div id="storyUserAvatar" class="avatar">✦</div>
+
+<div>
+<h3 id="storyUsername">Your Story</h3>
+<p id="storyTime">Just now</p>
+</div>
+
+<button class="story-close" id="closeStory">✕</button>
+
+</div>
+
+<div id="storyContent" class="story-content">✨</div>
+
+</div>
+
+</section>
+
+
+<!-- PROFILE -->
+<section id="profileScreen" class="screen">
+
+<header class="page-header">
+<button class="back-btn" id="profileBack">‹</button>
+<h2>My Profile</h2>
+</header>
+
+<div class="profile-card">
+
+<div class="profile-avatar">✦</div>
+
+<h2 id="displayProfileName">ChatX User</h2>
+
+<p>Your space. Your identity.</p>
+
+<label for="profileName">Display Name</label>
+
+<input
+type="text"
+id="profileName"
+placeholder="Enter your name"
+maxlength="30">
+
+<button id="saveProfile" class="primary-btn">
+Save Profile
+</button>
+
+<p id="accountEmail" style="overflow-wrap:anywhere"></p>
+
+<button
+id="logoutBtn"
+class="secondary-btn"
+type="button"
+style="margin-top:18px">
+Log Out
+</button>
+
+</div>
+
+<div class="settings-card">
+<h3>About ChatX</h3>
+<p>Midnight Aurora Edition</p>
+<p>Version 1.0</p>
+</div>
+
+</section>
+
+
+<!-- NEW CHAT MODAL -->
+<div id="newChatModal" class="modal hidden">
+
+<div class="modal-card">
+
+<h2>New Conversation ✦</h2>
+<p>Start a new conversation.</p>
+
+<form id="newChatForm">
+
+<input
+type="text"
+id="newChatName"
+placeholder="Friend's name"
+maxlength="30"
+required>
+
+<div class="modal-actions">
+
+<button
+type="button"
+id="cancelNewChat"
+class="secondary-btn">
+Cancel
+</button>
+
+<button type="submit" class="primary-btn">
+Create Chat
+</button>
+
+</div>
+
+</form>
+
+</div>
+</div>
+
+
+<!-- STORY MODAL -->
+<div id="storyModal" class="modal hidden">
+
+<div class="modal-card">
+
+<h2>Create Moment ✨</h2>
+<p>Share something with your friends.</p>
+
+<form id="storyForm">
+
+<textarea
+id="storyText"
+placeholder="What's on your mind?"
+maxlength="300"
+required></textarea>
+
+<div class="modal-actions">
+
+<button
+type="button"
+id="cancelStory"
+class="secondary-btn">
+Cancel
+</button>
+
+<button type="submit" class="primary-btn">
+Post Story
+</button>
+
+</div>
+
+</form>
+
+</div>
+</div>
+
+</div>
+
+
+<!-- ORIGINAL CHAT FEATURES -->
+<script type="module" src="script.js"></script>
+
+
+<!-- AUTH SCREEN CONTROLS -->
+<script>
+const loginPanel = document.getElementById("loginPanel");
+const signupPanel = document.getElementById("signupPanel");
+const authMessage = document.getElementById("authMessage");
+const authLoading = document.getElementById("authLoading");
+
+function showMessage(message, type = "error") {
+  authMessage.textContent = message;
+  authMessage.className = "auth-message show " + type;
+}
+
+function clearMessage() {
+  authMessage.textContent = "";
+  authMessage.className = "auth-message";
+}
+
+function setBusy(form, busy) {
+  const button = form.querySelector('button[type="submit"]');
+
+  if (!button) return;
+
+  if (!button.dataset.originalText) {
+    button.dataset.originalText = button.textContent.trim();
+  }
+
+  button.disabled = busy;
+  button.textContent = busy
+    ? "Please wait..."
+    : button.dataset.originalText;
+}
+
+function friendlyError(error) {
+  const messages = {
+    "auth/email-already-in-use":
+      "This email already has an account. Please log in.",
+
+    "auth/invalid-email":
+      "Please enter a valid email address.",
+
+    "auth/weak-password":
+      "Password must contain at least 6 characters.",
+
+    "auth/invalid-credential":
+      "Incorrect email or password.",
+
+    "auth/user-not-found":
+      "Account not found.",
+
+    "auth/wrong-password":
+      "Incorrect email or password.",
+
+    "auth/too-many-requests":
+      "Too many attempts. Try again later.",
+
+    "auth/network-request-failed":
+      "Network error. Check your internet connection.",
+
+    "auth/operation-not-allowed":
+      "Email/Password authentication is disabled.",
+
+    "auth/unauthorized-domain":
+      "This domain is not authorized in Firebase.",
+
+    "auth/invalid-api-key":
+      "Firebase API key is invalid.",
+
+    "auth/operation-not-supported-in-this-environment":
+      "This app environment does not support this authentication operation."
+  };
+
+  return messages[error?.code] ||
+    "Error: " + (error?.message || "Unknown problem");
+}
+
+document.getElementById("showSignup").onclick = () => {
+  clearMessage();
+  loginPanel.hidden = true;
+  signupPanel.hidden = false;
+};
+
+document.getElementById("showLogin").onclick = () => {
+  clearMessage();
+  signupPanel.hidden = true;
+  loginPanel.hidden = false;
+};
+
+window.addEventListener("error", (event) => {
+  if (document.body.classList.contains("auth-locked")) {
+    showMessage("JavaScript error: " + event.message);
+  }
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  if (document.body.classList.contains("auth-locked")) {
+    showMessage(
+      "App error: " +
+      (event.reason?.message || "Unexpected error")
+    );
+  }
+});
+</script>
+
+
+<!-- FIREBASE AUTHENTICATION -->
+<script type="module">
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCAeOr_hpbi22EHQ3w1RakU-WUASEIif1A",
+  authDomain: "chatx-b1cea.firebaseapp.com",
+  projectId: "chatx-b1cea",
+  storageBucket: "chatx-b1cea.firebasestorage.app",
+  messagingSenderId: "784164213926",
+  appId: "1:784164213926:web:83cd1aafdba8c539689067",
+  measurementId: "G-MM7342DKW0"
+};
+
+try {
+
+  const firebaseAppModule = await import(
+    "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js"
+  );
+
+  const firebaseAuthModule = await import(
+    "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js"
+  );
+
+  const {
+    initializeApp
+  } = firebaseAppModule;
+
+  const {
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    onAuthStateChanged,
+    signOut,
+    updateProfile,
+    sendPasswordResetEmail
+  } = firebaseAuthModule;
+
+  const firebaseApp = initializeApp(firebaseConfig);
+  const auth = getAuth(firebaseApp);
+
+  const authScreen = document.getElementById("authScreen");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  document.getElementById("loginForm").addEventListener(
+    "submit",
+    async (event) => {
+
+      event.preventDefault();
+
+      const form = event.currentTarget;
+
+      const email = document
+        .getElementById("loginEmail")
+        .value.trim();
+
+      const password = document
+        .getElementById("loginPassword")
+        .value;
+
+      clearMessage();
+      setBusy(form, true);
+
+      try {
+
+        await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+      } catch (error) {
+
+        showMessage(friendlyError(error));
+
+      } finally {
+
+        setBusy(form, false);
+
+      }
+
+    }
+  );
+
+
+  document.getElementById("signupForm").addEventListener(
+    "submit",
+    async (event) => {
+
+      event.preventDefault();
+
+      const form = event.currentTarget;
+
+      const name = document
+        .getElementById("signupName")
+        .value.trim();
+
+      const email = document
+        .getElementById("signupEmail")
+        .value.trim();
+
+      const password = document
+        .getElementById("signupPassword")
+        .value;
+
+      const confirmPassword = document
+        .getElementById("signupConfirm")
+        .value;
+
+      clearMessage();
+
+      if (name.length < 2) {
+        showMessage("Name must contain at least 2 characters.");
+        return;
+      }
+
+      if (password.length < 6) {
+        showMessage("Password must have at least 6 characters.");
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        showMessage("Passwords do not match.");
+        return;
+      }
+
+      setBusy(form, true);
+
+      try {
+
+        const result = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+        try {
+          await updateProfile(result.user, {
+            displayName: name
+          });
+        } catch (profileError) {
+          console.warn("Profile update failed:", profileError);
+        }
+
+        document.getElementById("profileName").value = name;
+
+        document.getElementById(
+          "displayProfileName"
+        ).textContent = name;
+
+        showMessage(
+          "Account created successfully!",
+          "success"
+        );
+
+      } catch (error) {
+
+        showMessage(friendlyError(error));
+
+      } finally {
+
+        setBusy(form, false);
+
+      }
+
+    }
+  );
+
+
+  document.getElementById("forgotPassword").addEventListener(
+    "click",
+    async () => {
+
+      const email = document
+        .getElementById("loginEmail")
+        .value.trim();
+
+      clearMessage();
+
+      if (!email) {
+        showMessage("Enter your email address first.");
+        return;
+      }
+
+      try {
+
+        await sendPasswordResetEmail(auth, email);
+
+        showMessage(
+          "If an account exists for this email, a password reset email has been sent.",
+          "success"
+        );
+
+      } catch (error) {
+
+        showMessage(friendlyError(error));
+
+      }
+
+    }
+  );
+
+
+  logoutBtn.addEventListener("click", async () => {
+
+    try {
+
+      await signOut(auth);
+
+    } catch (error) {
+
+      showMessage(friendlyError(error));
+      alert(friendlyError(error));
+
+    }
+
+  });
+
+
+  onAuthStateChanged(
+    auth,
+    (user) => {
+
+      authLoading.hidden = true;
+
+      if (user) {
+
+        document.body.classList.remove("auth-locked");
+
+        authScreen.hidden = true;
+
+        const name =
+          user.displayName ||
+          user.email?.split("@")[0] ||
+          "ChatX User";
+
+        document.getElementById(
+          "displayProfileName"
+        ).textContent = name;
+
+        document.getElementById(
+          "profileName"
+        ).value = name;
+
+        document.getElementById(
+          "accountEmail"
+        ).textContent = user.email || "";
+
+      } else {
+
+        document.body.classList.add("auth-locked");
+
+        authScreen.hidden = false;
+
+        document.getElementById("loginPassword").value = "";
+
+      }
+
+    },
+    (error) => {
+
+      authLoading.hidden = true;
+      showMessage(friendlyError(error));
+
+    }
+  );
+
+} catch (error) {
+
+  authLoading.hidden = true;
+
+  console.error("Firebase initialization failed:", error);
+
+  showMessage(
+    "Firebase could not load. Check your internet connection or app WebView. Details: " +
+    (error?.message || "Unknown error")
+  );
+
+}
+
+</script>
+
+</body>
+</html>  <p id="chatStatus">Conversation</p>
       </div>
 
       <button
