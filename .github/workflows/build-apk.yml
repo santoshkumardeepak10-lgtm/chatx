@@ -11,28 +11,43 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build ChatX Android APK
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Accept Android SDK licenses
+      - name: Prepare Android SDK
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses || true
+          set -e
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
-      - name: Install Android SDK packages
-        run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "platforms;android-35" "build-tools;35.0.0"
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found at $SDKMANAGER"
+            exit 1
+          fi
+
+          set -o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses
+
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Create Android project
+        shell: bash
         run: |
+          set -e
+
           mkdir -p android/app/src/main/java/com/chatx/app
 
           cat > android/settings.gradle <<'EOF'
@@ -43,6 +58,7 @@ jobs:
                   gradlePluginPortal()
               }
           }
+
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
@@ -50,6 +66,7 @@ jobs:
                   mavenCentral()
               }
           }
+
           rootProject.name = 'ChatX'
           include ':app'
           EOF
@@ -123,14 +140,15 @@ jobs:
                   super.onCreate(savedInstanceState);
 
                   webView = new WebView(this);
+
                   WebSettings settings = webView.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
 
                   webView.setWebViewClient(new WebViewClient());
                   webView.setWebChromeClient(new WebChromeClient());
-                  setContentView(webView);
 
+                  setContentView(webView);
                   webView.loadUrl(
                       "https://santoshkumardeepak10-lgtm.github.io/chatx/"
                   );
@@ -152,8 +170,8 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build APK
-        run: gradle -p android assembleDebug --no-daemon
+      - name: Build debug APK
+        run: gradle -p android assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
