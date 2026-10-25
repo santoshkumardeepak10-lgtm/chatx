@@ -1,12 +1,17 @@
 /* ==========================================
    CHATX — MIDNIGHT AURORA
-   VERSION 2.0
-   FIREBASE REAL-TIME CHAT
+   VERSION 3.1
+
+   REAL-TIME CHAT
+   SHARED 24-HOUR STORIES
+   IN-APP NOTIFICATIONS
+   UNREAD CHAT BADGES
+   FIREBASE AUTH + FIRESTORE
 ========================================== */
 
 "use strict";
 
-/* ---------- FIREBASE IMPORTS ---------- */
+/* ========== FIREBASE IMPORTS ========== */
 
 import {
   initializeApp,
@@ -35,7 +40,7 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
-/* ---------- FIREBASE CONFIG ---------- */
+/* ========== FIREBASE CONFIG ========== */
 
 const firebaseConfig = {
   apiKey: "AIzaSyCAeOr_hpbi22EHQ3w1RakU-WUASEIif1A",
@@ -54,7 +59,7 @@ const firebaseApp = getApps().length
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
-/* ---------- ELEMENTS ---------- */
+/* ========== ELEMENTS ========== */
 
 const $ = id => document.getElementById(id);
 
@@ -65,16 +70,17 @@ const profileScreen = $("profileScreen");
 const peopleScreen = $("peopleScreen");
 
 const chatList = $("chatList");
+const peopleList = $("peopleList");
 const messagesBox = $("messages");
 const storiesList = $("storiesList");
-const peopleList = $("peopleList");
 
-/* ---------- APPLICATION STATE ---------- */
+/* ========== STATE ========== */
 
 let currentUser = null;
 
 let registeredUsers = [];
 let conversations = [];
+let stories = [];
 
 let activeChatId = null;
 let activeChatUser = null;
@@ -82,62 +88,21 @@ let activeChatUser = null;
 let usersUnsubscribe = null;
 let chatsUnsubscribe = null;
 let messagesUnsubscribe = null;
+let storiesUnsubscribe = null;
+
+let sessionVersion = 0;
 
 let storyTimer = null;
 let activeStoryId = null;
 
-let sessionVersion = 0;
+let notificationsReady = false;
+let knownChatUpdates = new Map();
 
-/* ---------- LOCAL STORIES STORAGE ---------- */
+let storyRefreshInterval = null;
 
-const STORAGE_KEY = "chatx_data_v1";
+const STORY_DURATION = 24 * 60 * 60 * 1000;
 
-function loadData() {
-  try {
-    const saved = JSON.parse(
-      localStorage.getItem(STORAGE_KEY) || "{}"
-    );
-
-    return {
-      stories: Array.isArray(saved.stories)
-        ? saved.stories
-        : []
-    };
-
-  } catch (error) {
-    console.error(error);
-
-    return {
-      stories: []
-    };
-  }
-}
-
-let appData = loadData();
-
-function saveData() {
-  try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        stories: appData.stories
-      })
-    );
-  } catch (error) {
-    console.error("Storage error:", error);
-  }
-}
-
-/* ---------- HELPERS ---------- */
-
-function makeId() {
-  if (crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-
-  return Date.now().toString(36) +
-    Math.random().toString(36).slice(2);
-}
+/* ========== HELPERS ========== */
 
 function getInitial(name) {
   return (name || "?")
@@ -163,27 +128,28 @@ function getTimestamp(value) {
     return value;
   }
 
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
   return 0;
 }
 
 function formatTime(value) {
-  const timestamp = getTimestamp(value);
+  const time = getTimestamp(value);
 
-  if (!timestamp) return "";
+  if (!time) return "";
 
-  return new Date(timestamp).toLocaleTimeString(
-    [],
-    {
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
+  return new Date(time).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
-function formatStoryTime(timestamp) {
+function formatStoryTime(time) {
   const minutes = Math.max(
     0,
-    Math.floor((Date.now() - timestamp) / 60000)
+    Math.floor((Date.now() - time) / 60000)
   );
 
   if (minutes < 1) return "Just now";
@@ -196,14 +162,23 @@ function formatStoryTime(timestamp) {
 }
 
 function showScreen(screen) {
-  if (!screen) return;
-
   document.querySelectorAll(".screen")
     .forEach(item => {
       item.classList.remove("active");
     });
 
-  screen.classList.add("active");
+  if (screen) {
+    screen.classList.add("active");
+  }
+}
+
+function selectTab(id) {
+  document.querySelectorAll(".nav-item")
+    .forEach(item => {
+      item.classList.remove("selected");
+    });
+
+  $(id)?.classList.add("selected");
 }
 
 function openModal(id) {
@@ -214,21 +189,14 @@ function closeModal(id) {
   $(id)?.classList.add("hidden");
 }
 
-function selectTab(id) {
-  document.querySelectorAll(".nav-item")
-    .forEach(button => {
-      button.classList.remove("selected");
-    });
-
-  $(id)?.classList.add("selected");
-}
-
 function showEmpty(container, text) {
+  if (!container) return;
+
   container.innerHTML = "";
 
-  const empty = document.createElement("div");
+  const div = document.createElement("div");
 
-  empty.style.cssText = `
+  div.style.cssText = `
     text-align:center;
     padding:40px 20px;
     color:#8c99b5;
@@ -236,9 +204,9 @@ function showEmpty(container, text) {
     line-height:1.8;
   `;
 
-  empty.textContent = text;
+  div.textContent = text;
 
-  container.appendChild(empty);
+  container.appendChild(div);
 }
 
 function reportError(error, action) {
@@ -246,21 +214,230 @@ function reportError(error, action) {
 
   if (error?.code === "permission-denied") {
     alert(
-      "Firebase permission denied. Check your Firestore Rules."
+      action +
+      " failed: Firebase permission denied. " +
+      "Check Firestore Security Rules."
     );
+
     return;
   }
 
   alert(
-    `${action} failed. Check your internet connection and try again.`
+    action +
+    " failed. " +
+    (error?.message || "Check internet connection.")
   );
 }
 
-/* ---------- AUTHENTICATION STATE ---------- */
+/* ========== NOTIFICATION STYLES ========== */
+
+const notificationStyle = document.createElement("style");
+
+notificationStyle.textContent = `
+.chatx-notification {
+  position:fixed;
+  top:18px;
+  left:50%;
+  transform:translateX(-50%);
+  width:calc(100% - 36px);
+  max-width:400px;
+  background:#192542;
+  color:white;
+  padding:15px;
+  border-radius:15px;
+  border:1px solid #5269aa;
+  box-shadow:0 10px 35px #0008;
+  z-index:99999;
+  font-family:Arial,sans-serif;
+  box-sizing:border-box;
+  cursor:pointer;
+}
+
+.chatx-notification strong {
+  display:block;
+  margin-bottom:6px;
+  color:#79d4ff;
+}
+
+.chatx-notification p {
+  margin:0;
+  font-size:13px;
+  overflow-wrap:anywhere;
+}
+
+.chatx-badge {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:19px;
+  height:19px;
+  padding:0 4px;
+  box-sizing:border-box;
+  border-radius:20px;
+  background:#ff4568;
+  color:white;
+  font-size:11px;
+  font-weight:bold;
+  margin-left:8px;
+}
+
+.chatx-story {
+  cursor:pointer;
+}
+
+.chatx-story-name {
+  max-width:75px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+`;
+
+document.head.appendChild(notificationStyle);
+
+/* ========== NOTIFICATION SOUND ========== */
+
+let audioContext = null;
+
+function playNotificationSound() {
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      window.webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    if (!audioContext) {
+      audioContext = new AudioContextClass();
+    }
+
+    if (audioContext.state === "suspended") {
+      audioContext.resume().catch(() => {});
+    }
+
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = 850;
+
+    gain.gain.setValueAtTime(
+      0.06,
+      audioContext.currentTime
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      audioContext.currentTime + 0.18
+    );
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start();
+    oscillator.stop(
+      audioContext.currentTime + 0.18
+    );
+
+  } catch (error) {
+    console.warn("Notification sound unavailable:", error);
+  }
+}
+
+document.addEventListener("click", () => {
+  if (!audioContext) return;
+
+  if (audioContext.state === "suspended") {
+    audioContext.resume().catch(() => {});
+  }
+});
+
+/* ========== SHOW NOTIFICATION ========== */
+
+function showNotification(title, message, onClick) {
+  document.querySelectorAll(".chatx-notification")
+    .forEach(item => item.remove());
+
+  const box = document.createElement("div");
+  box.className = "chatx-notification";
+
+  const heading = document.createElement("strong");
+  heading.textContent = "🔔 " + title;
+
+  const description = document.createElement("p");
+  description.textContent = message;
+
+  box.append(heading, description);
+
+  if (typeof onClick === "function") {
+    box.addEventListener("click", () => {
+      box.remove();
+      onClick();
+    });
+  }
+
+  document.body.appendChild(box);
+
+  playNotificationSound();
+
+  setTimeout(() => {
+    box.remove();
+  }, 4500);
+}
+
+/* ========== UNREAD TRACKING ========== */
+
+function readKey(chatId) {
+  return `chatx_read_${currentUser?.uid}_${chatId}`;
+}
+
+function getLastRead(chatId) {
+  try {
+    return Number(
+      localStorage.getItem(readKey(chatId))
+    ) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function markChatRead(chatId) {
+  if (!currentUser || !chatId) return;
+
+  try {
+    localStorage.setItem(
+      readKey(chatId),
+      String(Date.now())
+    );
+  } catch (error) {
+    console.warn(error);
+  }
+
+  renderChats($("searchInput").value);
+}
+
+function isUnread(chat) {
+  if (!currentUser) return false;
+
+  if (!chat.lastSenderId) return false;
+
+  if (chat.lastSenderId === currentUser.uid) {
+    return false;
+  }
+
+  if (activeChatId === chat.id) {
+    return false;
+  }
+
+  return getTimestamp(chat.updatedAt) >
+    getLastRead(chat.id);
+}
+
+/* ========== AUTH STATE ========== */
 
 onAuthStateChanged(auth, async user => {
-
   sessionVersion++;
+
   const thisSession = sessionVersion;
 
   stopListeners();
@@ -269,9 +446,13 @@ onAuthStateChanged(auth, async user => {
 
   registeredUsers = [];
   conversations = [];
+  stories = [];
 
   activeChatId = null;
   activeChatUser = null;
+
+  knownChatUpdates.clear();
+  notificationsReady = false;
 
   if (!user) {
     chatList.innerHTML = "";
@@ -280,6 +461,9 @@ onAuthStateChanged(auth, async user => {
 
     $("chatCount").textContent = "0 chats";
     $("peopleCount").textContent = "0 people";
+
+    renderStories();
+    showScreen(homeScreen);
 
     return;
   }
@@ -293,16 +477,12 @@ onAuthStateChanged(auth, async user => {
 
     startUsersListener();
     startChatsListener();
+    startStoriesListener();
 
     renderProfile();
-    renderStories();
-
     goHome();
 
-    console.log(
-      "ChatX Firebase connected:",
-      user.uid
-    );
+    console.log("ChatX connected:", user.uid);
 
   } catch (error) {
     if (thisSession === sessionVersion) {
@@ -311,14 +491,10 @@ onAuthStateChanged(auth, async user => {
   }
 });
 
-/* ---------- FIRESTORE USER PROFILE ---------- */
+/* ========== USER PROFILE ========== */
 
 async function createUserProfile(user) {
-  const userRef = doc(
-    db,
-    "users",
-    user.uid
-  );
+  const userRef = doc(db, "users", user.uid);
 
   const snapshot = await getDoc(userRef);
 
@@ -336,102 +512,148 @@ async function createUserProfile(user) {
     snapshot.data().displayName !== name
   ) {
     await updateDoc(userRef, {
-      uid: user.uid,
       displayName: name,
       updatedAt: serverTimestamp()
     });
   }
 }
 
-/* ---------- USERS LISTENER ---------- */
+/* ========== USERS LISTENER ========== */
 
 function startUsersListener() {
+  const myUid = currentUser.uid;
+
   usersUnsubscribe = onSnapshot(
     collection(db, "users"),
 
     snapshot => {
-      registeredUsers = snapshot.docs.map(
-        item => ({
-          id: item.id,
-          ...item.data()
-        })
-      );
+      if (currentUser?.uid !== myUid) return;
 
-      renderPeople(
-        $("peopleSearch").value
-      );
+      registeredUsers = snapshot.docs.map(item => ({
+        id: item.id,
+        ...item.data()
+      }));
 
-      renderChats(
-        $("searchInput").value
-      );
+      renderPeople($("peopleSearch").value);
+      renderChats($("searchInput").value);
+      renderStories();
     },
 
-    error => {
-      reportError(error, "Loading users");
-    }
+    error => reportError(error, "Loading users")
   );
 }
 
-/* ---------- CONVERSATIONS LISTENER ---------- */
+/* ========== CONVERSATIONS LISTENER ========== */
 
 function startChatsListener() {
+  const myUid = currentUser.uid;
+
   const chatsQuery = query(
     collection(db, "conversations"),
-    where(
-      "participants",
-      "array-contains",
-      currentUser.uid
-    )
+    where("participants", "array-contains", myUid)
   );
 
   chatsUnsubscribe = onSnapshot(
     chatsQuery,
 
     snapshot => {
-      conversations = snapshot.docs.map(
-        item => ({
-          id: item.id,
-          ...item.data()
-        })
-      );
+      if (currentUser?.uid !== myUid) return;
 
-      conversations.sort(
+      const updatedChats = snapshot.docs.map(item => ({
+        id: item.id,
+        ...item.data()
+      }));
+
+      updatedChats.sort(
         (a, b) =>
           getTimestamp(b.updatedAt) -
           getTimestamp(a.updatedAt)
       );
 
-      renderChats(
-        $("searchInput").value
-      );
+      if (notificationsReady) {
+        updatedChats.forEach(chat => {
+          const timestamp =
+            getTimestamp(chat.updatedAt);
+
+          const previous =
+            knownChatUpdates.get(chat.id);
+
+          if (
+            previous !== undefined &&
+            timestamp > previous &&
+            chat.lastSenderId &&
+            chat.lastSenderId !== myUid &&
+            chat.id !== activeChatId &&
+            !snapshot.metadata.fromCache &&
+            !snapshot.metadata.hasPendingWrites
+          ) {
+            const otherId =
+              getOtherUserId(chat);
+
+            const person =
+              findUser(otherId) || {
+                uid: otherId,
+                displayName: getChatName(chat)
+              };
+
+            showNotification(
+              getChatName(chat),
+              chat.lastMessage || "New message",
+              () => openChatWithUser(person)
+            );
+          }
+        });
+      }
+
+      updatedChats.forEach(chat => {
+        const timestamp =
+          getTimestamp(chat.updatedAt);
+
+        if (timestamp) {
+          knownChatUpdates.set(
+            chat.id,
+            Math.max(
+              knownChatUpdates.get(chat.id) || 0,
+              timestamp
+            )
+          );
+        }
+      });
+
+      conversations = updatedChats;
+
+      if (!snapshot.metadata.fromCache) {
+        notificationsReady = true;
+      }
+
+      renderChats($("searchInput").value);
     },
 
-    error => {
-      reportError(error, "Loading conversations");
-    }
+    error => reportError(error, "Loading conversations")
   );
 }
 
-/* ---------- STOP LISTENERS ---------- */
+/* ========== STOP LISTENERS ========== */
 
 function stopListeners() {
-  if (usersUnsubscribe) {
-    usersUnsubscribe();
-    usersUnsubscribe = null;
-  }
+  if (usersUnsubscribe) usersUnsubscribe();
+  if (chatsUnsubscribe) chatsUnsubscribe();
+  if (messagesUnsubscribe) messagesUnsubscribe();
+  if (storiesUnsubscribe) storiesUnsubscribe();
 
-  if (chatsUnsubscribe) {
-    chatsUnsubscribe();
-    chatsUnsubscribe = null;
-  }
+  usersUnsubscribe = null;
+  chatsUnsubscribe = null;
+  messagesUnsubscribe = null;
+  storiesUnsubscribe = null;
 
-  if (messagesUnsubscribe) {
-    messagesUnsubscribe();
-    messagesUnsubscribe = null;
-  }
+  clearTimeout(storyTimer);
+  clearInterval(storyRefreshInterval);
+
+  storyTimer = null;
+  storyRefreshInterval = null;
 }
 
-/* ---------- FIND USER ---------- */
+/* ========== USER HELPERS ========== */
 
 function findUser(uid) {
   return registeredUsers.find(
@@ -448,17 +670,15 @@ function getOtherUserId(chat) {
 function getChatName(chat) {
   const otherId = getOtherUserId(chat);
 
-  const person = findUser(otherId);
-
-  return person?.displayName ||
+  return findUser(otherId)?.displayName ||
     chat.participantNames?.[otherId] ||
     "ChatX User";
 }
 
-/* ---------- CHAT LIST ---------- */
+/* ========== CHAT LIST ========== */
 
 function renderChats(search = "") {
-  if (!chatList) return;
+  if (!chatList || !currentUser) return;
 
   chatList.innerHTML = "";
 
@@ -471,7 +691,7 @@ function renderChats(search = "") {
       .includes(search.toLowerCase())
   );
 
-  if (filtered.length === 0) {
+  if (!filtered.length) {
     showEmpty(
       chatList,
       search
@@ -500,7 +720,6 @@ function renderChats(search = "") {
     title.textContent = name;
 
     const preview = document.createElement("p");
-
     preview.textContent =
       chat.lastMessage ||
       "Start your conversation ✨";
@@ -511,21 +730,261 @@ function renderChats(search = "") {
     meta.className = "chat-meta";
 
     const time = document.createElement("time");
-    time.textContent = formatTime(
-      chat.updatedAt
-    );
+    time.textContent =
+      formatTime(chat.updatedAt);
 
     meta.appendChild(time);
 
-    item.append(
-      avatar,
-      details,
-      meta
-    );
+    if (isUnread(chat)) {
+      const badge = document.createElement("span");
+      badge.className = "chatx-badge";
+      badge.textContent = "1";
+      meta.appendChild(badge);
+    }
+
+    item.append(avatar, details, meta);
 
     item.addEventListener("click", () => {
       const person = findUser(otherId) || {
         uid: otherId,
+        displayName: name
+      };
+
+      openChatWithUser(person);
+    });
+
+    chatList.appendChild(item);
+  });
+}
+
+/* ========== PEOPLE DIRECTORY ========== */
+
+function renderPeople(search = "") {
+  if (!currentUser) return;
+
+  peopleList.innerHTML = "";
+
+  const allPeople = registeredUsers.filter(
+    user => user.uid !== currentUser.uid
+  );
+
+  const filtered = allPeople.filter(
+    user => (user.displayName || "")
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
+
+  $("peopleCount").textContent =
+    `${allPeople.length} people`;
+
+  if (!filtered.length) {
+    showEmpty(
+      peopleList,
+      search
+        ? "No matching users found."
+        : "No registered users found yet."
+    );
+
+    return;
+  }
+
+  filtered.forEach(person => {
+    const item = document.createElement("div");
+    item.className = "chat-item";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent =
+      getInitial(person.displayName);
+
+    const details = document.createElement("div");
+    details.className = "chat-details";
+
+    const name = document.createElement("h3");
+    name.textContent =
+      person.displayName || "ChatX User";
+
+    const status = document.createElement("p");
+    status.textContent = "Tap to start chatting";
+
+    details.append(name, status);
+
+    item.append(avatar, details);
+
+    item.addEventListener("click", () => {
+      openChatWithUser(person);
+    });
+
+    peopleList.appendChild(item);
+  });
+}
+
+/* ========== NEW CHAT ========== */
+
+function showNewChatModal() {
+  $("newChatName").value = "";
+  openModal("newChatModal");
+}
+
+$("newChatBtn").addEventListener(
+  "click",
+  showNewChatModal
+);
+
+$("addPersonBtn").addEventListener(
+  "click",
+  showNewChatModal
+);
+
+$("cancelNewChat").addEventListener(
+  "click",
+  () => closeModal("newChatModal")
+);
+
+$("newChatForm").addEventListener(
+  "submit",
+  async event => {
+    event.preventDefault();
+
+    if (!currentUser) return;
+
+    const name = $("newChatName").value
+      .trim()
+      .toLowerCase();
+
+    const matches = registeredUsers.filter(
+      user =>
+        user.uid !== currentUser.uid &&
+        (user.displayName || "")
+          .toLowerCase() === name
+    );
+
+    if (!matches.length) {
+      alert(
+        "User not found. Your friend must create a ChatX account first."
+      );
+      return;
+    }
+
+    if (matches.length > 1) {
+      alert(
+        "Multiple users have this name. Select your friend from People."
+      );
+      return;
+    }
+
+    closeModal("newChatModal");
+
+    await openChatWithUser(matches[0]);
+  }
+);
+
+/* ========== OPEN CHAT ========== */
+
+async function openChatWithUser(person) {
+  if (!currentUser || !person?.uid) return;
+
+  if (person.uid === currentUser.uid) {
+    alert("You cannot chat with yourself.");
+    return;
+  }
+
+  const myUid = currentUser.uid;
+  const thisSession = sessionVersion;
+
+  const participants = [
+    myUid,
+    person.uid
+  ].sort();
+
+  const chatId = participants.join("__");
+
+  const chatRef = doc(
+    db,
+    "conversations",
+    chatId
+  );
+
+  try {
+    const snapshot = await getDoc(chatRef);
+
+    if (
+      thisSession !== sessionVersion ||
+      currentUser?.uid !== myUid
+    ) return;
+
+    if (!snapshot.exists()) {
+      await setDoc(chatRef, {
+        participants,
+        participantNames: {
+          [myUid]: getDisplayName(currentUser),
+          [person.uid]:
+            person.displayName || "ChatX User"
+        },
+        lastMessage: "",
+        lastSenderId: "",
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    if (
+      thisSession !== sessionVersion ||
+      currentUser?.uid !== myUid
+    ) return;
+
+    if (messagesUnsubscribe) {
+      messagesUnsubscribe();
+      messagesUnsubscribe = null;
+    }
+
+    activeChatId = chatId;
+    activeChatUser = person;
+
+    $("chatUsername").textContent =
+      person.displayName || "ChatX User";
+
+    $("chatAvatar").textContent =
+      getInitial(person.displayName);
+
+    $("chatStatus").textContent =
+      "Real-time conversation";
+
+    $("messageInput").value = "";
+    messagesBox.innerHTML = "";
+
+    showScreen(chatScreen);
+
+    markChatRead(chatId);
+    startMessagesListener(chatId);
+
+  } catch (error) {
+    reportError(error, "Opening chat");
+  }
+}
+
+/* ========== MESSAGES LISTENER ========== */
+
+function startMessagesListener(chatId) {
+  const messagesQuery = query(
+    collection(
+      db,
+      "conversations",
+      chatId,
+      "messages"
+    ),
+    orderBy("createdAt", "asc")
+  );
+
+  messagesUnsubscribe = onSnapshot(
+    messagesQuery,
+
+    snapshot => {
+      if (activeChatId !== chatId) return;
+
+      const messages = snapshot.docs.map(item => ({
+        id: item.id,
+        ...item.data()
+     d,
         displayName: name
       };
 
