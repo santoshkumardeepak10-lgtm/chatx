@@ -41,6 +41,11 @@ jobs:
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platforms;android-35"
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "build-tools;35.0.0"
 
+      - name: Enable AndroidX
+        shell: bash
+        run: |
+          echo "android.useAndroidX=true" > android/gradle.properties
+
       - name: Create Firebase configuration
         shell: bash
         env:
@@ -74,6 +79,7 @@ jobs:
                   gradlePluginPortal()
               }
           }
+
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
@@ -81,6 +87,7 @@ jobs:
                   mavenCentral()
               }
           }
+
           rootProject.name = 'ChatX'
           include ':app'
           EOF
@@ -88,7 +95,7 @@ jobs:
           cat > android/build.gradle <<'EOF'
           plugins {
               id 'com.android.application' version '8.7.3' apply false
-              id 'com.google.gms.google-services' version '4.5.0' apply false
+              id 'com.google.gms.google-services' version '4.4.4' apply false
           }
           EOF
 
@@ -106,8 +113,8 @@ jobs:
                   applicationId 'com.chatx.app'
                   minSdk 23
                   targetSdk 28
-                  versionCode 3
-                  versionName '1.2'
+                  versionCode 4
+                  versionName '1.3'
               }
 
               compileOptions {
@@ -192,8 +199,6 @@ jobs:
                   FirebaseMessaging.getInstance().getToken()
                       .addOnCompleteListener(task -> {
                           if (task.isSuccessful()) {
-                              // Token obtained. Register it securely with a backend
-                              // before using it for user-specific chat notifications.
                               android.util.Log.d("ChatXFCM", "FCM token obtained");
                           } else {
                               android.util.Log.e("ChatXFCM", "FCM token failed",
@@ -237,7 +242,9 @@ jobs:
                       channel.setDescription("Notifications for ChatX messages");
                       NotificationManager manager =
                           getSystemService(NotificationManager.class);
-                      if (manager != null) manager.createNotificationChannel(channel);
+                      if (manager != null) {
+                          manager.createNotificationChannel(channel);
+                      }
                   }
               }
 
@@ -270,7 +277,7 @@ jobs:
               @Override
               public void onNewToken(String token) {
                   super.onNewToken(token);
-                  // Store the token through an authenticated, secure backend.
+                  // A secure authenticated backend must register this token.
               }
 
               @Override
@@ -315,7 +322,8 @@ jobs:
 
                   PendingIntent pendingIntent = PendingIntent.getActivity(
                       this, 0, intent,
-                      PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                      PendingIntent.FLAG_UPDATE_CURRENT
+                          | PendingIntent.FLAG_IMMUTABLE
                   );
 
                   NotificationCompat.Builder notification =
@@ -323,13 +331,17 @@ jobs:
                           .setSmallIcon(android.R.drawable.ic_dialog_info)
                           .setContentTitle(title)
                           .setContentText(body)
-                          .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                          .setStyle(
+                              new NotificationCompat.BigTextStyle().bigText(body)
+                          )
                           .setPriority(NotificationCompat.PRIORITY_HIGH)
                           .setAutoCancel(true)
                           .setContentIntent(pendingIntent);
 
-                  manager.notify((int) (System.currentTimeMillis() & 0x7fffffff),
-                      notification.build());
+                  manager.notify(
+                      (int) (System.currentTimeMillis() & 0x7fffffff),
+                      notification.build()
+                  );
               }
           }
           EOF
